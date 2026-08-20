@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.ticket import Category
+from app.models.comment import CommentType
 from app.schemas.ticket import (
     TicketCreate, TicketUpdate, TicketResponse, TicketDetailResponse, TicketListResponse,
     CategoryResponse
@@ -77,10 +78,10 @@ def get_ticket_detail(
     """Get full ticket details including comments and audit log timeline."""
     ticket = get_ticket_by_id(db, ticket_id, current_user)
     
-    # Filter out internal notes if viewer is a regular user
+    # Filter comments: regular users only see public comments
     filtered_comments = ticket.comments
-    if current_user.role == "user":
-        filtered_comments = [c for c in ticket.comments if c.comment_type != "internal_note"]
+    if current_user.role == UserRole.USER:
+        filtered_comments = [c for c in ticket.comments if c.comment_type == CommentType.PUBLIC]
     
     return TicketDetailResponse(
         id=ticket.id,

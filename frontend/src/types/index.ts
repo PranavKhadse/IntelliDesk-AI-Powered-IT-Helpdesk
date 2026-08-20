@@ -96,3 +96,35 @@ export interface AuthTokens {
   token_type: string;
   expires_in: number;
 }
+
+export interface TicketCreatePayload {
+  title: string;
+  description: string;
+  category_id?: number;
+  priority?: TicketPriority;
+}
+
+export interface TicketUpdatePayload {
+  title?: string;
+  description?: string;
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  category_id?: number;
+  assignee_id?: string | null;
+}
+
+export interface CommentCreatePayload {
+  content: string;
+  comment_type?: CommentType;
+}
+
+export interface TicketFilterParams {
+  page?: number;
+  page_size?: number;
+  status?: TicketStatus | string;
+  priority?: TicketPriority | string;
+  category_id?: number;
+  search?: string;
+  assigned_to_me?: boolean;
+}
+

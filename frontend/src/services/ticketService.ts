@@ -1,0 +1,71 @@
+import { apiClient } from './api';
+import type {
+  Category,
+  Ticket,
+  TicketDetail,
+  TicketListResponse,
+  TicketCreatePayload,
+  TicketUpdatePayload,
+  CommentCreatePayload,
+  TicketComment,
+  AgentSummary,
+  TicketFilterParams,
+} from '../types';
+
+export const ticketService = {
+  /**
+   * Fetch all active categories with SLA targets.
+   */
+  async getCategories(): Promise<Category[]> {
+    const res = await apiClient.get<Category[]>('/tickets/categories');
+    return res.data;
+  },
+
+  /**
+   * List tickets with pagination, status/priority filtering, and search.
+   */
+  async getTickets(params: TicketFilterParams = {}): Promise<TicketListResponse> {
+    const res = await apiClient.get<TicketListResponse>('/tickets', { params });
+    return res.data;
+  },
+
+  /**
+   * Get single ticket by ID or ticket number with comments and audit logs.
+   */
+  async getTicketDetail(ticketId: string): Promise<TicketDetail> {
+    const res = await apiClient.get<TicketDetail>(`/tickets/${ticketId}`);
+    return res.data;
+  },
+
+  /**
+   * Create a new ticket.
+   */
+  async createTicket(payload: TicketCreatePayload): Promise<Ticket> {
+    const res = await apiClient.post<Ticket>('/tickets', payload);
+    return res.data;
+  },
+
+  /**
+   * Update ticket status, priority, assignment, or details.
+   */
+  async updateTicket(ticketId: string, payload: TicketUpdatePayload): Promise<Ticket> {
+    const res = await apiClient.patch<Ticket>(`/tickets/${ticketId}`, payload);
+    return res.data;
+  },
+
+  /**
+   * Add a public comment or internal note to a ticket.
+   */
+  async addComment(ticketId: string, payload: CommentCreatePayload): Promise<TicketComment> {
+    const res = await apiClient.post<TicketComment>(`/tickets/${ticketId}/comments`, payload);
+    return res.data;
+  },
+
+  /**
+   * List support agents and admins for assignment (Agent/Admin only).
+   */
+  async getAgents(): Promise<AgentSummary[]> {
+    const res = await apiClient.get<AgentSummary[]>('/users/agents');
+    return res.data;
+  },
+};

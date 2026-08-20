@@ -52,10 +52,14 @@ def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta
     return encoded_jwt
 
 
-def decode_token(token: str) -> Dict[str, Any]:
-    """Decode and validate a JWT token."""
+def decode_token(token: str, expected_type: Optional[str] = None) -> Dict[str, Any]:
+    """Decode and validate a JWT token, optionally verifying the token type claim."""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if expected_type is not None:
+            token_type = payload.get("type")
+            if token_type != expected_type:
+                raise ValueError(f"Invalid token type: expected '{expected_type}', got '{token_type}'")
         return payload
     except JWTError as e:
         raise ValueError(f"Invalid or expired token: {str(e)}")

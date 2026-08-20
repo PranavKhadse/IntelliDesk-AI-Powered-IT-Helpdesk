@@ -152,11 +152,17 @@ def update_ticket(
     if not ticket:
         raise NotFoundError("Ticket", ticket_id)
 
-    # Role check: Only agents/admins can update status, priority, assignment
+    # Role check: Only agents/admins can update status, priority, category, assignment
     if actor.role == UserRole.USER:
-        # Users can only update their own ticket title/description if still OPEN
+        # Users can only edit their own tickets
         if ticket.creator_id != actor.id:
             raise ForbiddenError("You can only edit your own tickets.")
+        
+        # End-users cannot modify status, priority, category, or assignment
+        if req.status is not None or req.priority is not None or req.category_id is not None or req.assignee_id is not None:
+            raise ForbiddenError("End-users cannot modify ticket status, priority, category, or assignment.")
+
+        # Users can only update their own ticket title/description if still OPEN
         if ticket.status != TicketStatus.OPEN:
             raise ForbiddenError("Cannot edit ticket details once it has entered processing.")
         
@@ -208,7 +214,15 @@ def update_ticket(
 
     if req.assignee_id is not None:
         if req.assignee_id != ticket.assignee_id:
-            ticket.assignee_id = req.assignee_id if req.assignee_id != "" else None
+            if req.assignee_id != "":
+                assignee = db.query(User).filter(User.id == req.assignee_id).first()
+                if not assignee:
+                    raise NotFoundError("User", req.assignee_id)
+                if assignee.role not in [UserRole.AGENT, UserRole.ADMIN]:
+                    raise ValidationError("Tickets can only be assigned to support agents or administrators.")
+                ticket.assignee_id = assignee.id
+            else:
+                ticket.assignee_id = None
             log_ticket_event(
                 db=db,
                 ticket_id=ticket.id,
@@ -219,7 +233,10 @@ def update_ticket(
             )
 
     if req.category_id is not None:
-        ticket.category_id = req.category_id
+        cat = db.query(Category).filter(Category.id == req.category_id).first()
+        if not cat:
+            raise NotFoundError("Category", req.category_id)
+        ticket.category_id = cat.id
 
     if req.title:
         ticket.title = req.title
@@ -242,13 +259,12 @@ def add_ticket_comment(
     if not ticket:
         raise NotFoundError("Ticket", ticket_id)
 
-    # Permission check for internal note
-    if req.comment_type == CommentType.INTERNAL_NOTE and author.role == UserRole.USER:
-        raise ForbiddenError("End-users cannot post internal agent notes.")
-
-    # Regular users can only comment on their own tickets
-    if author.role == UserRole.USER and ticket.creator_id != author.id:
-        raise ForbiddenError("You cannot comment on a ticket that does not belong to you.")
+    # Permission check for end-users: only comment on own tickets and only public comments
+    if author.role == UserRole.USER:
+        if ticket.creator_id != author.id:
+            raise ForbiddenError("You cannot comment on a ticket that does not belong to you.")
+        if req.comment_type != CommentType.PUBLIC:
+            raise ForbiddenError("End-users cannot post internal agent notes.")
 
     comment = TicketComment(
         ticket_id=ticket.id,

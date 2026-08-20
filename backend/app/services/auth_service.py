@@ -62,10 +62,7 @@ def authenticate_user(db: Session, req: LoginRequest) -> Tuple[User, TokenRespon
 def refresh_access_token(db: Session, refresh_token_str: str) -> TokenResponse:
     """Validate refresh token and issue a fresh access token."""
     try:
-        payload = decode_token(refresh_token_str)
-        if payload.get("type") != "refresh":
-            raise UnauthorizedError("Invalid token type. Refresh token required.")
-        
+        payload = decode_token(refresh_token_str, expected_type="refresh")
         user_id = payload.get("sub")
         if not user_id:
             raise UnauthorizedError("Invalid token payload.")
