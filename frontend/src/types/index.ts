@@ -101,6 +101,13 @@ export interface TicketTriageRecommendation {
   explanation: string;
 }
 
+export interface AIResponseDraft {
+  draft_response: string;
+  tone: string;
+  key_points: string[];
+  confidence: number;
+}
+
 export interface TicketListResponse {
   items: Ticket[];
   total: number;

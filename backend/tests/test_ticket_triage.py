@@ -119,6 +119,7 @@ def test_ticket_triage_rejects_malformed_structured_response(client, user_auth_h
 
 
 def test_agent_can_approve_valid_recommendation(client, user_auth_headers, agent_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=agent_auth_headers)
@@ -140,6 +141,7 @@ def test_agent_can_approve_valid_recommendation(client, user_auth_headers, agent
 
 
 def test_admin_can_approve_valid_recommendation(client, user_auth_headers, admin_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=admin_auth_headers)
@@ -155,7 +157,8 @@ def test_admin_can_approve_valid_recommendation(client, user_auth_headers, admin
     assert response.json()["decision"] == "accepted"
 
 
-def test_user_cannot_approve_or_reject(client, user_auth_headers, db_session, monkeypatch):
+def test_user_cannot_approve_or_reject(client, user_auth_headers, test_agent, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=user_auth_headers)
@@ -177,6 +180,7 @@ def test_user_cannot_approve_or_reject(client, user_auth_headers, db_session, mo
 
 
 def test_agent_can_reject_recommendation(client, user_auth_headers, agent_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=agent_auth_headers)
@@ -195,6 +199,7 @@ def test_agent_can_reject_recommendation(client, user_auth_headers, agent_auth_h
 
 
 def test_invalid_stale_recommendation_cannot_be_approved(client, user_auth_headers, agent_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=agent_auth_headers)
@@ -215,6 +220,7 @@ def test_invalid_stale_recommendation_cannot_be_approved(client, user_auth_heade
 
 
 def test_duplicate_approval_is_prevented(client, user_auth_headers, agent_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=agent_auth_headers)
@@ -236,6 +242,7 @@ def test_duplicate_approval_is_prevented(client, user_auth_headers, agent_auth_h
 
 
 def test_approval_applies_only_valid_recommendation_fields(client, user_auth_headers, agent_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(
@@ -258,6 +265,7 @@ def test_approval_applies_only_valid_recommendation_fields(client, user_auth_hea
 
 
 def test_rejection_does_not_modify_ticket(client, user_auth_headers, agent_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=agent_auth_headers)
@@ -278,6 +286,7 @@ def test_rejection_does_not_modify_ticket(client, user_auth_headers, agent_auth_
 
 
 def test_ai_recommendation_decision_creates_audit_record(client, user_auth_headers, agent_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=agent_auth_headers)
@@ -301,6 +310,7 @@ def test_ai_recommendation_decision_creates_audit_record(client, user_auth_heade
 
 
 def test_admin_can_reject_recommendation(client, user_auth_headers, admin_auth_headers, db_session, monkeypatch):
+    install_ai_mock(monkeypatch, AIResponse(content=triage_content(), status="success", used_fallback=False))
     add_database_category(db_session)
     ticket_id = create_triage_ticket(client, user_auth_headers)
     triage_response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=admin_auth_headers)

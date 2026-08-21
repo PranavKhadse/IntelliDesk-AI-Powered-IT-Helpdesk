@@ -11,6 +11,7 @@ import type {
   AgentSummary,
   TicketFilterParams,
   TicketTriageRecommendation,
+  AIResponseDraft,
 } from '../types';
 
 export const ticketService = {
@@ -75,6 +76,14 @@ export const ticketService = {
    */
   async rejectTicketTriage(ticketId: string, recommendationId: string): Promise<{ recommendation_id: string; decision: 'accepted' | 'rejected' }> {
     const res = await apiClient.post<{ recommendation_id: string; decision: 'accepted' | 'rejected' }>(`/tickets/${ticketId}/ai-triage/reject`, { recommendation_id: recommendationId });
+    return res.data;
+  },
+
+  /**
+   * Request an AI-assisted customer response draft for support staff (Agent/Admin only).
+   */
+  async getResponseDraft(ticketId: string): Promise<AIResponseDraft> {
+    const res = await apiClient.post<AIResponseDraft>(`/tickets/${ticketId}/ai-response-draft`);
     return res.data;
   },
 

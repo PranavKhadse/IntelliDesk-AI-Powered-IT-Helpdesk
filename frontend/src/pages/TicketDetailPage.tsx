@@ -11,6 +11,7 @@ import type {
   TicketPriority,
   CommentType,
   TicketTriageRecommendation,
+  AIResponseDraft,
 } from '../types';
 import {
   ArrowLeft,
@@ -30,6 +31,11 @@ import {
   X,
   CheckCircle,
   Sparkles,
+  Copy,
+  Check,
+  RotateCw,
+  FileText,
+  Bot,
 } from 'lucide-react';
 
 export const TicketDetailPage: React.FC = () => {
@@ -47,6 +53,13 @@ export const TicketDetailPage: React.FC = () => {
   const [commentType, setCommentType] = useState<CommentType>('public');
   const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+
+  // AI Response Draft state (staff-only)
+  const [responseDraft, setResponseDraft] = useState<AIResponseDraft | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState<boolean>(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [copiedDraft, setCopiedDraft] = useState<boolean>(false);
+  const [draftAppliedMsg, setDraftAppliedMsg] = useState<string | null>(null);
 
   // AI triage state (recommendation-only)
   const [triageRecommendation, setTriageRecommendation] = useState<TicketTriageRecommendation | null>(null);
@@ -188,6 +201,41 @@ export const TicketDetailPage: React.FC = () => {
     } finally {
       setIsSubmittingTriageDecision(false);
     }
+  };
+
+  const handleGenerateDraft = async () => {
+    if (!ticket || isLoadingDraft) return;
+
+    setIsLoadingDraft(true);
+    setDraftError(null);
+    setDraftAppliedMsg(null);
+    try {
+      const draft = await ticketService.getResponseDraft(ticket.id);
+      setResponseDraft(draft);
+    } catch (err: unknown) {
+      setDraftError(getApiErrorMessage(err, 'AI response drafting is currently unavailable. Please try again later.'));
+    } finally {
+      setIsLoadingDraft(false);
+    }
+  };
+
+  const handleCopyDraft = async () => {
+    if (!responseDraft?.draft_response) return;
+    try {
+      await navigator.clipboard.writeText(responseDraft.draft_response);
+      setCopiedDraft(true);
+      setTimeout(() => setCopiedDraft(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy draft to clipboard', err);
+    }
+  };
+
+  const handleUseAsCommentDraft = () => {
+    if (!responseDraft?.draft_response) return;
+    setCommentContent(responseDraft.draft_response);
+    setCommentType('public');
+    setDraftAppliedMsg('AI draft loaded into response box. Review and edit before sending.');
+    setTimeout(() => setDraftAppliedMsg(null), 5000);
   };
 
   // Handle Staff Ticket Updates (Status, Priority, Assignee, Category)
@@ -476,6 +524,124 @@ export const TicketDetailPage: React.FC = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Staff AI Response Assistant */}
+            {isStaff && (
+              <div className="ai-response-assistant-section">
+                <div className="ai-assistant-header-row">
+                  <div className="ai-assistant-title">
+                    <Bot size={16} color="#c084fc" />
+                    <span>AI Response Assistant</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm ai-draft-btn"
+                    onClick={handleGenerateDraft}
+                    disabled={isLoadingDraft}
+                  >
+                    {isLoadingDraft ? (
+                      <>
+                        <Loader2 size={14} className="spinner" />
+                        <span>Drafting Response...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={14} color="#c084fc" />
+                        <span>{responseDraft ? 'Regenerate Draft' : 'Draft Response with AI'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {draftError && (
+                  <div className="alert alert-error" style={{ margin: 0 }}>
+                    <AlertCircle size={15} />
+                    <span>{draftError}</span>
+                  </div>
+                )}
+
+                {draftAppliedMsg && (
+                  <div className="alert alert-success" style={{ margin: 0 }}>
+                    <CheckCircle size={15} />
+                    <span>{draftAppliedMsg}</span>
+                  </div>
+                )}
+
+                {responseDraft && (
+                  <div className="ai-draft-card glass-card">
+                    <div className="ai-draft-card-header">
+                      <div className="ai-draft-badge-row">
+                        <span className="ai-draft-pill">DRAFT ONLY</span>
+                        <span className="ai-draft-tone-pill">Tone: {responseDraft.tone}</span>
+                        <span className="ai-draft-confidence-pill">
+                          {Math.round(responseDraft.confidence * 100)}% Confidence
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="ai-draft-dismiss-btn"
+                        onClick={() => setResponseDraft(null)}
+                        title="Dismiss draft"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    {responseDraft.key_points && responseDraft.key_points.length > 0 && (
+                      <div className="ai-draft-key-points">
+                        <span className="key-points-title">Key Points Addressed:</span>
+                        <ul className="key-points-list">
+                          {responseDraft.key_points.map((point, idx) => (
+                            <li key={idx}>{point}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="ai-draft-content-box">
+                      <p>{responseDraft.draft_response}</p>
+                    </div>
+
+                    <div className="ai-draft-actions-bar">
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleUseAsCommentDraft}
+                      >
+                        <FileText size={14} />
+                        <span>Use as Comment Draft</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleCopyDraft}
+                      >
+                        {copiedDraft ? (
+                          <>
+                            <Check size={14} color="#10b981" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} />
+                            <span>Copy Draft</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleGenerateDraft}
+                        disabled={isLoadingDraft}
+                      >
+                        <RotateCw size={14} className={isLoadingDraft ? 'spinner' : ''} />
+                        <span>Regenerate</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

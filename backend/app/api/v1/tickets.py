@@ -11,12 +11,15 @@ from app.schemas.ticket import (
     TicketCreate, TicketUpdate, TicketResponse, TicketDetailResponse, TicketListResponse,
     CategoryResponse
 )
+from app.core.exceptions import ForbiddenError
 from app.schemas.comment import CommentCreate, CommentResponse
+from app.schemas.response_draft import ResponseDraft
 from app.schemas.triage import TicketTriageRecommendation, TriageDecisionRequest, TriageDecisionResponse
 from app.services.ticket_service import (
     create_ticket, get_ticket_by_id, list_tickets, update_ticket, add_ticket_comment
 )
 from app.services.ai_service import get_ai_service
+from app.services.response_draft_service import generate_response_draft
 from app.services.triage_service import (
     approve_ticket_triage,
     build_ticket_triage_input,
@@ -173,6 +176,19 @@ def update_ticket_endpoint(
 ):
     """Update ticket status, priority, assignment, or metadata."""
     return update_ticket(db, ticket_id, req, current_user)
+
+
+@router.post("/{ticket_id}/ai-response-draft", response_model=ResponseDraft)
+def draft_ticket_response_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate an AI-assisted customer response draft for support staff (Agent/Admin only)."""
+    if current_user.role not in [UserRole.AGENT, UserRole.ADMIN]:
+        raise ForbiddenError("Only support staff can generate AI response drafts.")
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    return generate_response_draft(ticket, get_ai_service())
 
 
 @router.post("/{ticket_id}/comments", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
