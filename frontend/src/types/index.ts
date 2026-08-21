@@ -6,6 +6,10 @@ export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
 
 export type CommentType = 'public' | 'internal_note' | 'system_event' | 'ai_resolution_draft';
 
+export type TriageUrgency = 'low' | 'medium' | 'high' | 'critical';
+
+export type TriageImpact = 'individual' | 'team' | 'department' | 'organization_wide';
+
 export interface User {
   id: string;
   email: string;
@@ -81,6 +85,22 @@ export interface TicketDetail extends Ticket {
   audit_logs: AuditLog[];
 }
 
+export interface TicketTriageRecommendation {
+  recommendation_id?: string;
+  category: string;
+  priority: TicketPriority;
+  urgency: TriageUrgency;
+  impact: TriageImpact;
+  suggested_team: string;
+  confidence: number;
+  confidence_level?: string;
+  evidence?: string[];
+  priority_reason?: string;
+  category_reason?: string;
+  urgency_impact_reason?: string;
+  explanation: string;
+}
+
 export interface TicketListResponse {
   items: Ticket[];
   total: number;
@@ -127,4 +147,3 @@ export interface TicketFilterParams {
   search?: string;
   assigned_to_me?: boolean;
 }
-

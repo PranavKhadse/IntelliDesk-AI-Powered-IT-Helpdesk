@@ -7,6 +7,8 @@ from app.core.config import settings
 from app.core.database import engine, Base
 from app.core.exceptions import AppError
 from app.api.v1.api_router import api_v1_router
+from app.schemas.ai import AIHealthResponse
+from app.services.ai_service import get_ai_service
 # Import all models so metadata is complete
 import app.models # noqa: F401
 
@@ -94,6 +96,12 @@ def health_check():
         "app": settings.APP_NAME,
         "environment": settings.ENVIRONMENT
     }
+
+
+@app.get("/api/v1/health/ai", response_model=AIHealthResponse, tags=["Health"])
+def ai_health_check():
+    """Expose only whether the AI service is available, never its configuration or secrets."""
+    return get_ai_service().health()
 
 
 # Mount V1 APIs

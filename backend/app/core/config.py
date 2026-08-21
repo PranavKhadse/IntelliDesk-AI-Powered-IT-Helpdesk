@@ -30,10 +30,12 @@ class Settings(BaseSettings):
     FAISS_INDEX_PATH: str = "app/rag/artifacts/faiss_index.bin"
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
     
-    # LLM Settings
-    LLM_PROVIDER: str = "gemini"
-    GEMINI_API_KEY: str = ""
-    OPENAI_API_KEY: str = ""
+    # AI Service Settings. The API key is backend-only and must never be sent to clients.
+    AI_PROVIDER: str = "none"
+    AI_API_KEY: str = ""
+    AI_MODEL: str = ""
+    AI_API_BASE_URL: str = ""
+    AI_TIMEOUT_SECONDS: float = 10.0
     
     @property
     def cors_origins_list(self) -> List[str]:

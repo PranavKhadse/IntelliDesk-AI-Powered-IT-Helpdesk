@@ -5,6 +5,7 @@ from typing import Generator
 # Set test environment variables before application imports
 os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-execution-only-32bytes"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["DEBUG"] = "True"
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

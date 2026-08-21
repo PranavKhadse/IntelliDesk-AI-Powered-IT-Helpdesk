@@ -11,6 +11,8 @@ class AuditAction:
     ASSIGNED = "assigned"
     COMMENT_ADDED = "comment_added"
     AI_TRIAGED = "ai_triaged"
+    AI_RECOMMENDATION_ACCEPTED = "ai_recommendation_accepted"
+    AI_RECOMMENDATION_REJECTED = "ai_recommendation_rejected"
 
 
 class AuditLog(Base, TimestampMixin):

@@ -118,16 +118,24 @@ def test_ticket_comments_and_internal_notes(client, user_auth_headers, agent_aut
     )
     assert agent_note.status_code == status.HTTP_201_CREATED
 
+    # Agent can also add a public comment
+    agent_public_comment = client.post(
+        f"/api/v1/tickets/{ticket_id}/comments",
+        headers=agent_auth_headers,
+        json={"content": "We will update you once the replacement arrives.", "comment_type": "public"}
+    )
+    assert agent_public_comment.status_code == status.HTTP_201_CREATED
+
     # Verify user detail view hides internal note
     user_view = client.get(f"/api/v1/tickets/{ticket_id}", headers=user_auth_headers)
     assert user_view.status_code == status.HTTP_200_OK
-    assert len(user_view.json()["comments"]) == 1
-    assert user_view.json()["comments"][0]["comment_type"] == "public"
+    assert len(user_view.json()["comments"]) == 2
+    assert all(comment["comment_type"] == "public" for comment in user_view.json()["comments"])
 
     # Agent detail view shows both comments
     agent_view = client.get(f"/api/v1/tickets/{ticket_id}", headers=agent_auth_headers)
     assert agent_view.status_code == status.HTTP_200_OK
-    assert len(agent_view.json()["comments"]) == 2
+    assert len(agent_view.json()["comments"]) == 3
 
 
 def test_user_cannot_modify_other_user_ticket(client, user_auth_headers, db_session):
@@ -193,6 +201,21 @@ def test_user_cannot_perform_agent_or_admin_operations(client, user_auth_headers
     )
     assert patch_priority.status_code == status.HTTP_403_FORBIDDEN
 
+    # User attempts to change category or assignee -> 403 Forbidden
+    patch_category = client.patch(
+        f"/api/v1/tickets/{ticket_id}",
+        headers=user_auth_headers,
+        json={"category_id": 1}
+    )
+    assert patch_category.status_code == status.HTTP_403_FORBIDDEN
+
+    patch_assignee = client.patch(
+        f"/api/v1/tickets/{ticket_id}",
+        headers=user_auth_headers,
+        json={"assignee_id": "another-user-id"}
+    )
+    assert patch_assignee.status_code == status.HTTP_403_FORBIDDEN
+
     # User attempts to access Admin-only user list -> 403 Forbidden
     users_res = client.get("/api/v1/users/", headers=user_auth_headers)
     assert users_res.status_code == status.HTTP_403_FORBIDDEN
@@ -230,7 +253,7 @@ def test_agent_cannot_perform_admin_operations(client, agent_auth_headers, test_
 
 
 def test_agent_authorized_operations(client, user_auth_headers, agent_auth_headers, test_agent):
-    """Ensure agents can reassign tickets, update priorities, and filter by assigned_to_me."""
+    """Ensure agents can update ticket management fields and filter by assigned_to_me."""
     create_res = client.post(
         "/api/v1/tickets/",
         headers=user_auth_headers,
@@ -238,15 +261,16 @@ def test_agent_authorized_operations(client, user_auth_headers, agent_auth_heade
     )
     ticket_id = create_res.json()["id"]
 
-    # Agent assigns ticket to themselves and sets priority to high
+    # Agent assigns ticket to themselves, changes priority, and changes category
     patch_res = client.patch(
         f"/api/v1/tickets/{ticket_id}",
         headers=agent_auth_headers,
-        json={"assignee_id": test_agent.id, "priority": "high"}
+        json={"assignee_id": test_agent.id, "priority": "high", "category_id": 1}
     )
     assert patch_res.status_code == status.HTTP_200_OK
     assert patch_res.json()["assignee_id"] == test_agent.id
     assert patch_res.json()["priority"] == "high"
+    assert patch_res.json()["category_id"] == 1
 
     # Agent lists tickets filtered by assigned_to_me
     list_res = client.get("/api/v1/tickets/?assigned_to_me=true", headers=agent_auth_headers)
@@ -254,8 +278,27 @@ def test_agent_authorized_operations(client, user_auth_headers, agent_auth_heade
     assert any(item["id"] == ticket_id for item in list_res.json()["items"])
 
 
-def test_admin_authorized_operations(client, admin_auth_headers, test_user):
-    """Ensure admins can list users and update user properties."""
+def test_admin_authorized_operations(client, admin_auth_headers, test_user, test_admin):
+    """Ensure admins can manage tickets as well as users."""
+    # Admin creates and manages a ticket
+    create_res = client.post(
+        "/api/v1/tickets/",
+        headers=admin_auth_headers,
+        json={"title": "Admin Managed Ticket", "description": "Ticket used to verify admin ticket controls."}
+    )
+    assert create_res.status_code == status.HTTP_201_CREATED
+
+    ticket_res = client.patch(
+        f"/api/v1/tickets/{create_res.json()['id']}",
+        headers=admin_auth_headers,
+        json={"status": "in_progress", "priority": "high", "category_id": 1, "assignee_id": test_admin.id}
+    )
+    assert ticket_res.status_code == status.HTTP_200_OK
+    assert ticket_res.json()["status"] == "in_progress"
+    assert ticket_res.json()["priority"] == "high"
+    assert ticket_res.json()["category_id"] == 1
+    assert ticket_res.json()["assignee_id"] == test_admin.id
+
     # Admin lists users
     list_res = client.get("/api/v1/users/", headers=admin_auth_headers)
     assert list_res.status_code == status.HTTP_200_OK
@@ -269,4 +312,3 @@ def test_admin_authorized_operations(client, admin_auth_headers, test_user):
     )
     assert patch_res.status_code == status.HTTP_200_OK
     assert patch_res.json()["department"] == "Security"
-

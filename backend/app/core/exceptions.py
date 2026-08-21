@@ -62,8 +62,17 @@ class ConflictError(AppError):
 class ValidationError(AppError):
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             message=message,
             error_code="VALIDATION_ERROR",
             details=details
+        )
+
+
+class ServiceUnavailableError(AppError):
+    def __init__(self, message: str = "The requested service is currently unavailable."):
+        super().__init__(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            message=message,
+            error_code="SERVICE_UNAVAILABLE"
         )

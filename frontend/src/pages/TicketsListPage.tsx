@@ -19,6 +19,7 @@ import {
 export const TicketsListPage: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestedPage = Number(searchParams.get('page'));
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -33,7 +34,9 @@ export const TicketsListPage: React.FC = () => {
   const [selectedPriority, setSelectedPriority] = useState<string>(searchParams.get('priority') || '');
   const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category_id') || '');
   const [assignedToMe, setAssignedToMe] = useState<boolean>(searchParams.get('assigned_to_me') === 'true');
-  const [currentPage, setCurrentPage] = useState<number>(Number(searchParams.get('page')) || 1);
+  const [currentPage, setCurrentPage] = useState<number>(
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+  );
   const pageSize = 15;
 
   const isStaff = user?.role === 'agent' || user?.role === 'admin';
@@ -64,7 +67,8 @@ export const TicketsListPage: React.FC = () => {
     if (searchTerm.trim()) params.search = searchTerm.trim();
     if (selectedStatus) params.status = selectedStatus;
     if (selectedPriority) params.priority = selectedPriority;
-    if (selectedCategory) params.category_id = Number(selectedCategory);
+    const categoryId = Number(selectedCategory);
+    if (Number.isInteger(categoryId) && categoryId > 0) params.category_id = categoryId;
     if (assignedToMe && isStaff) params.assigned_to_me = true;
 
     try {
@@ -87,7 +91,6 @@ export const TicketsListPage: React.FC = () => {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1);
-    fetchTickets();
   };
 
   const handleResetFilters = () => {

@@ -10,6 +10,7 @@ import type {
   TicketStatus,
   TicketPriority,
   CommentType,
+  TicketTriageRecommendation,
 } from '../types';
 import {
   ArrowLeft,
@@ -28,6 +29,7 @@ import {
   Save,
   X,
   CheckCircle,
+  Sparkles,
 } from 'lucide-react';
 
 export const TicketDetailPage: React.FC = () => {
@@ -45,6 +47,14 @@ export const TicketDetailPage: React.FC = () => {
   const [commentType, setCommentType] = useState<CommentType>('public');
   const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+
+  // AI triage state (recommendation-only)
+  const [triageRecommendation, setTriageRecommendation] = useState<TicketTriageRecommendation | null>(null);
+  const [isLoadingTriage, setIsLoadingTriage] = useState<boolean>(false);
+  const [triageError, setTriageError] = useState<string | null>(null);
+  const [isSubmittingTriageDecision, setIsSubmittingTriageDecision] = useState<boolean>(false);
+  const [triageDecisionState, setTriageDecisionState] = useState<'accepted' | 'rejected' | null>(null);
+  const [triageDecisionMessage, setTriageDecisionMessage] = useState<string | null>(null);
 
   // Staff update controls state
   const [selectedStatus, setSelectedStatus] = useState<TicketStatus>('open');
@@ -69,6 +79,7 @@ export const TicketDetailPage: React.FC = () => {
     if (!ticketId) return;
     setIsLoading(true);
     setErrorMessage(null);
+    setTicket(null);
     try {
       const data = await ticketService.getTicketDetail(ticketId);
       setTicket(data);
@@ -128,6 +139,54 @@ export const TicketDetailPage: React.FC = () => {
       setCommentError(msg);
     } finally {
       setIsSubmittingComment(false);
+    }
+  };
+
+  const getConfidenceLabel = (score: number): string => {
+    if (score >= 0.75) return 'High';
+    if (score >= 0.4) return 'Medium';
+    return 'Low';
+  };
+
+  const handleTriage = async () => {
+    if (!ticket || isLoadingTriage) return;
+
+    setIsLoadingTriage(true);
+    setTriageError(null);
+    setTriageDecisionState(null);
+    setTriageDecisionMessage(null);
+    try {
+      const recommendation = await ticketService.getTicketTriage(ticket.id);
+      setTriageRecommendation(recommendation);
+    } catch (err: unknown) {
+      setTriageError(getApiErrorMessage(err, 'AI triage is currently unavailable. Please try again later.'));
+    } finally {
+      setIsLoadingTriage(false);
+    }
+  };
+
+  const handleTriageDecision = async (decision: 'accept' | 'reject') => {
+    if (!ticket || !triageRecommendation?.recommendation_id || isSubmittingTriageDecision) return;
+
+    setIsSubmittingTriageDecision(true);
+    setTriageError(null);
+    setTriageDecisionMessage(null);
+    try {
+      const response = decision === 'accept'
+        ? await ticketService.approveTicketTriage(ticket.id, triageRecommendation.recommendation_id)
+        : await ticketService.rejectTicketTriage(ticket.id, triageRecommendation.recommendation_id);
+
+      setTriageDecisionState(response.decision);
+      setTriageDecisionMessage(
+        response.decision === 'accepted'
+          ? 'AI recommendation accepted. Ticket values were refreshed.'
+          : 'AI recommendation rejected. The ticket remains unchanged.'
+      );
+      await loadTicket();
+    } catch (err: unknown) {
+      setTriageError(getApiErrorMessage(err, 'Unable to record the recommendation decision.'));
+    } finally {
+      setIsSubmittingTriageDecision(false);
     }
   };
 
@@ -515,6 +574,146 @@ export const TicketDetailPage: React.FC = () => {
 
         {/* Right Column: Staff Controls & Ticket Metadata */}
         <div className="ticket-sidebar-col">
+          <div className="ticket-metadata-card glass-card">
+            <div className="sidebar-card-header">
+              <Sparkles size={17} color="#a78bfa" />
+              <h3>AI Recommendation</h3>
+            </div>
+            <p className="form-hint" style={{ marginBottom: '1rem' }}>
+              Review this recommendation before making any ticket changes.
+            </p>
+
+            {triageError && (
+              <div className="alert alert-error" style={{ marginBottom: '0.75rem' }}>
+                <AlertCircle size={16} />
+                <span>{triageError}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-full"
+              onClick={handleTriage}
+              disabled={isLoadingTriage}
+            >
+              {isLoadingTriage ? (
+                <>
+                  <Loader2 size={16} className="spinner" />
+                  <span>Analyzing Ticket...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  <span>AI Triage</span>
+                </>
+              )}
+            </button>
+
+            {triageRecommendation && (
+              <div className="meta-property-list" style={{ marginTop: '1rem' }}>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Category</span>
+                  <span className="meta-prop-value">{triageRecommendation.category}</span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Priority</span>
+                  <span className="meta-prop-value" style={{ textTransform: 'capitalize' }}>{triageRecommendation.priority}</span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Urgency</span>
+                  <span className="meta-prop-value" style={{ textTransform: 'capitalize' }}>{triageRecommendation.urgency}</span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Impact</span>
+                  <span className="meta-prop-value" style={{ textTransform: 'capitalize' }}>
+                    {triageRecommendation.impact.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Suggested Team</span>
+                  <span className="meta-prop-value">{triageRecommendation.suggested_team}</span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Confidence</span>
+                  <span className="meta-prop-value">
+                    {Math.round(triageRecommendation.confidence * 100)}% ({triageRecommendation.confidence_level || getConfidenceLabel(triageRecommendation.confidence)})
+                  </span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Evidence</span>
+                  <span className="meta-prop-sub">
+                    {(triageRecommendation.evidence && triageRecommendation.evidence.length > 0)
+                      ? triageRecommendation.evidence.join(' • ')
+                      : triageRecommendation.explanation}
+                  </span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Priority Reason</span>
+                  <span className="meta-prop-sub">{triageRecommendation.priority_reason || triageRecommendation.explanation}</span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Category Reason</span>
+                  <span className="meta-prop-sub">{triageRecommendation.category_reason || triageRecommendation.explanation}</span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Urgency / Impact Reason</span>
+                  <span className="meta-prop-sub">{triageRecommendation.urgency_impact_reason || triageRecommendation.explanation}</span>
+                </div>
+                <div className="meta-property-item">
+                  <span className="meta-prop-label">Explanation</span>
+                  <span className="meta-prop-sub">{triageRecommendation.explanation}</span>
+                </div>
+              </div>
+            )}
+
+            {isStaff && triageRecommendation && (
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                {triageDecisionState && triageDecisionMessage && (
+                  <div className={`alert ${triageDecisionState === 'accepted' ? 'alert-success' : 'alert-info'}`}>
+                    <CheckCircle size={16} />
+                    <span>{triageDecisionMessage}</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-primary btn-full"
+                  onClick={() => handleTriageDecision('accept')}
+                  disabled={isSubmittingTriageDecision || triageDecisionState === 'accepted'}
+                >
+                  {isSubmittingTriageDecision ? (
+                    <>
+                      <Loader2 size={16} className="spinner" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={16} />
+                      <span>Accept Recommendation</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-full"
+                  onClick={() => handleTriageDecision('reject')}
+                  disabled={isSubmittingTriageDecision || triageDecisionState === 'rejected'}
+                >
+                  {isSubmittingTriageDecision ? (
+                    <>
+                      <Loader2 size={16} className="spinner" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <X size={16} />
+                      <span>Reject Recommendation</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Staff Quick Actions (Status, Priority, Assignee) */}
           {isStaff && (
             <div className="staff-control-card glass-card">

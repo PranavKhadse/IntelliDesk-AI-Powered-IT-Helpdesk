@@ -10,6 +10,7 @@ import type {
   TicketComment,
   AgentSummary,
   TicketFilterParams,
+  TicketTriageRecommendation,
 } from '../types';
 
 export const ticketService = {
@@ -50,6 +51,30 @@ export const ticketService = {
    */
   async updateTicket(ticketId: string, payload: TicketUpdatePayload): Promise<Ticket> {
     const res = await apiClient.patch<Ticket>(`/tickets/${ticketId}`, payload);
+    return res.data;
+  },
+
+  /**
+   * Request a recommendation-only AI triage assessment for an accessible ticket.
+   */
+  async getTicketTriage(ticketId: string): Promise<TicketTriageRecommendation> {
+    const res = await apiClient.post<TicketTriageRecommendation>(`/tickets/${ticketId}/ai-triage`);
+    return res.data;
+  },
+
+  /**
+   * Accept a previously generated AI recommendation for a ticket.
+   */
+  async approveTicketTriage(ticketId: string, recommendationId: string): Promise<{ recommendation_id: string; decision: 'accepted' | 'rejected' }> {
+    const res = await apiClient.post<{ recommendation_id: string; decision: 'accepted' | 'rejected' }>(`/tickets/${ticketId}/ai-triage/approve`, { recommendation_id: recommendationId });
+    return res.data;
+  },
+
+  /**
+   * Reject a previously generated AI recommendation for a ticket.
+   */
+  async rejectTicketTriage(ticketId: string, recommendationId: string): Promise<{ recommendation_id: string; decision: 'accepted' | 'rejected' }> {
+    const res = await apiClient.post<{ recommendation_id: string; decision: 'accepted' | 'rejected' }>(`/tickets/${ticketId}/ai-triage/reject`, { recommendation_id: recommendationId });
     return res.data;
   },
 

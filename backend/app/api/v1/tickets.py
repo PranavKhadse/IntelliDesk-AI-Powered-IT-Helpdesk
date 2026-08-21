@@ -12,8 +12,17 @@ from app.schemas.ticket import (
     CategoryResponse
 )
 from app.schemas.comment import CommentCreate, CommentResponse
+from app.schemas.triage import TicketTriageRecommendation, TriageDecisionRequest, TriageDecisionResponse
 from app.services.ticket_service import (
     create_ticket, get_ticket_by_id, list_tickets, update_ticket, add_ticket_comment
+)
+from app.services.ai_service import get_ai_service
+from app.services.triage_service import (
+    approve_ticket_triage,
+    build_ticket_triage_input,
+    generate_ticket_triage,
+    reject_ticket_triage,
+    store_ticket_triage,
 )
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
@@ -107,6 +116,52 @@ def get_ticket_detail(
         comments=filtered_comments,
         audit_logs=ticket.audit_logs
     )
+
+
+@router.post("/{ticket_id}/ai-triage", response_model=TicketTriageRecommendation)
+def triage_ticket(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Return a validated AI triage recommendation without modifying the ticket."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    categories = [category.name for category in db.query(Category).filter(Category.is_active == True).all()]
+    teams = [
+        department for (department,) in db.query(User.department).filter(
+            User.role.in_([UserRole.AGENT, UserRole.ADMIN]),
+            User.is_active == True
+        ).distinct().all() if department
+    ]
+    triage_input = build_ticket_triage_input(ticket, categories, teams)
+    recommendation = generate_ticket_triage(triage_input, get_ai_service())
+    return store_ticket_triage(db, ticket, current_user, recommendation)
+
+
+@router.post("/{ticket_id}/ai-triage/approve", response_model=TriageDecisionResponse)
+def approve_ticket_decision(
+    ticket_id: str,
+    req: TriageDecisionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Apply a previously generated AI recommendation only after human approval."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    approve_ticket_triage(db, ticket, current_user, req.recommendation_id)
+    return TriageDecisionResponse(recommendation_id=req.recommendation_id, decision="accepted")
+
+
+@router.post("/{ticket_id}/ai-triage/reject", response_model=TriageDecisionResponse)
+def reject_ticket_decision(
+    ticket_id: str,
+    req: TriageDecisionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Decline a previously generated AI recommendation without changing the ticket."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    reject_ticket_triage(db, ticket, current_user, req.recommendation_id)
+    return TriageDecisionResponse(recommendation_id=req.recommendation_id, decision="rejected")
 
 
 @router.patch("/{ticket_id}", response_model=TicketResponse)
