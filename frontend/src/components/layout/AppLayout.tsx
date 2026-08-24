@@ -14,6 +14,7 @@ import {
   Shield,
   Headphones,
   BookOpen,
+  BarChart3,
 } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
@@ -21,6 +22,8 @@ export const AppLayout: React.FC = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [backendHealthy, setBackendHealthy] = useState<boolean | null>(null);
+
+  const isStaff = user?.role === 'agent' || user?.role === 'admin';
 
   useEffect(() => {
     let isMounted = true;
@@ -103,6 +106,16 @@ export const AppLayout: React.FC = () => {
               <LayoutDashboard size={17} />
               <span>Dashboard</span>
             </NavLink>
+
+            {isStaff && (
+              <NavLink
+                to="/analytics"
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              >
+                <BarChart3 size={17} />
+                <span>Analytics</span>
+              </NavLink>
+            )}
 
             <NavLink
               to="/tickets"
@@ -198,6 +211,17 @@ export const AppLayout: React.FC = () => {
             <LayoutDashboard size={18} />
             <span>Dashboard</span>
           </NavLink>
+
+          {isStaff && (
+            <NavLink
+              to="/analytics"
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <BarChart3 size={18} />
+              <span>Analytics</span>
+            </NavLink>
+          )}
 
           <NavLink
             to="/tickets"

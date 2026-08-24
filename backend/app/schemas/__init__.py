@@ -15,6 +15,20 @@ from app.schemas.kb_article import (
 from app.schemas.ai_grounding import (
     GroundingStatus, GroundedArticleReference, ProviderGroundingResult, TicketGroundingResponse
 )
+from app.schemas.sla import (
+    SLAState, FirstResponseStatus,
+    SLAPolicyBase, SLAPolicyCreate, SLAPolicyUpdate, SLAPolicyResponse, SLAPolicyListResponse,
+    TicketSLAMetrics, TicketSLAResponse,
+    ProviderSLARiskResponse, AISLARiskAssessment, TicketAIRiskResponse,
+    EscalationDecisionRequest, EscalationDecisionResponse
+)
+from app.schemas.analytics import (
+    AnalyticsPreset, AnalyticsDateRange,
+    TicketVolumeMetrics, VolumeTrendPoint, ResolutionMetrics, FirstResponseMetrics,
+    SLAMetricsSummary, CategoryDistributionItem, PriorityDistributionItem,
+    AgentWorkloadItem, EscalationMetricsSummary, AIAdoptionMetrics,
+    OperationsAnalyticsDashboardResponse
+)
 
 __all__ = [
     "LoginRequest",
@@ -52,4 +66,31 @@ __all__ = [
     "GroundedArticleReference",
     "ProviderGroundingResult",
     "TicketGroundingResponse",
+    "SLAState",
+    "FirstResponseStatus",
+    "SLAPolicyBase",
+    "SLAPolicyCreate",
+    "SLAPolicyUpdate",
+    "SLAPolicyResponse",
+    "SLAPolicyListResponse",
+    "TicketSLAMetrics",
+    "TicketSLAResponse",
+    "ProviderSLARiskResponse",
+    "AISLARiskAssessment",
+    "TicketAIRiskResponse",
+    "EscalationDecisionRequest",
+    "EscalationDecisionResponse",
+    "AnalyticsPreset",
+    "AnalyticsDateRange",
+    "TicketVolumeMetrics",
+    "VolumeTrendPoint",
+    "ResolutionMetrics",
+    "FirstResponseMetrics",
+    "SLAMetricsSummary",
+    "CategoryDistributionItem",
+    "PriorityDistributionItem",
+    "AgentWorkloadItem",
+    "EscalationMetricsSummary",
+    "AIAdoptionMetrics",
+    "OperationsAnalyticsDashboardResponse",
 ]

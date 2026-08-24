@@ -3,9 +3,13 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.tickets import router as tickets_router
 from app.api.v1.users import router as users_router
 from app.api.v1.kb import router as kb_router
+from app.api.v1.sla import sla_router
+from app.api.v1.analytics import analytics_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(tickets_router)
 api_v1_router.include_router(users_router)
 api_v1_router.include_router(kb_router)
+api_v1_router.include_router(sla_router)
+api_v1_router.include_router(analytics_router)

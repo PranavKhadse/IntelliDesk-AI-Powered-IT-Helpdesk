@@ -13,6 +13,9 @@ class AuditAction:
     AI_TRIAGED = "ai_triaged"
     AI_RECOMMENDATION_ACCEPTED = "ai_recommendation_accepted"
     AI_RECOMMENDATION_REJECTED = "ai_recommendation_rejected"
+    AI_SLA_RISK_ASSESSED = "ai_sla_risk_assessed"
+    AI_ESCALATION_ACCEPTED = "ai_escalation_accepted"
+    AI_ESCALATION_REJECTED = "ai_escalation_rejected"
 
 
 class AuditLog(Base, TimestampMixin):

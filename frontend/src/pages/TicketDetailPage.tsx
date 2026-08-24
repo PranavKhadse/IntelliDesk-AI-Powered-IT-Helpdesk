@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ticketService } from '../services/ticketService';
 import { kbService } from '../services/kbService';
+import { slaService } from '../services/slaService';
 import { getApiErrorMessage } from '../services/api';
 import type {
   TicketDetail,
@@ -16,6 +17,8 @@ import type {
   TicketSummary,
   GroundedArticleReference,
   TicketGroundingResponse,
+  TicketSLAMetrics,
+  AISLARiskAssessment,
 } from '../types';
 import {
   ArrowLeft,
@@ -44,6 +47,10 @@ import {
   BookOpen,
   ExternalLink,
   HelpCircle,
+  AlertOctagon,
+  Timer,
+  Activity,
+  ShieldAlert,
 } from 'lucide-react';
 
 export const TicketDetailPage: React.FC = () => {
@@ -104,6 +111,19 @@ export const TicketDetailPage: React.FC = () => {
   const [matchedArticles, setMatchedArticles] = useState<GroundedArticleReference[]>([]);
   const [isLoadingMatches, setIsLoadingMatches] = useState<boolean>(false);
 
+  // SLA State & Metrics
+  const [slaMetrics, setSlaMetrics] = useState<TicketSLAMetrics | null>(null);
+  const [isLoadingSLA, setIsLoadingSLA] = useState<boolean>(false);
+  const [slaError, setSlaError] = useState<string | null>(null);
+
+  // AI SLA Risk & Escalation Intelligence state (staff-only)
+  const [slaRiskAssessment, setSlaRiskAssessment] = useState<AISLARiskAssessment | null>(null);
+  const [isLoadingRisk, setIsLoadingRisk] = useState<boolean>(false);
+  const [riskError, setRiskError] = useState<string | null>(null);
+  const [isSubmittingEscalation, setIsSubmittingEscalation] = useState<boolean>(false);
+  const [escalationDecisionState, setEscalationDecisionState] = useState<'accepted' | 'rejected' | null>(null);
+  const [escalationDecisionMessage, setEscalationDecisionMessage] = useState<string | null>(null);
+
   const isStaff = user?.role === 'agent' || user?.role === 'admin';
   const isCreator = user?.id === ticket?.creator_id;
   const canUserEdit = isCreator && user?.role === 'user' && ticket?.status === 'open';
@@ -118,6 +138,21 @@ export const TicketDetailPage: React.FC = () => {
       console.error('Failed to load KB matches:', err);
     } finally {
       setIsLoadingMatches(false);
+    }
+  }, []);
+
+  // Load SLA Metrics
+  const loadSLAMetrics = useCallback(async (ticketIdToFetch: string) => {
+    setIsLoadingSLA(true);
+    setSlaError(null);
+    try {
+      const data = await slaService.getTicketSLA(ticketIdToFetch);
+      setSlaMetrics(data.sla_metrics);
+    } catch (err) {
+      console.error('Failed to load SLA metrics:', err);
+      setSlaError('SLA metrics currently unavailable.');
+    } finally {
+      setIsLoadingSLA(false);
     }
   }, []);
 
@@ -137,6 +172,7 @@ export const TicketDetailPage: React.FC = () => {
       setEditTitle(data.title);
       setEditDescription(data.description);
       loadKBMatches(data.id);
+      loadSLAMetrics(data.id);
     } catch (err: unknown) {
       console.error('Failed to load ticket:', err);
       const msg = getApiErrorMessage(err, 'Failed to retrieve ticket details.');
@@ -144,7 +180,7 @@ export const TicketDetailPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [ticketId, loadKBMatches]);
+  }, [ticketId, loadKBMatches, loadSLAMetrics]);
 
   // Trigger AI Grounding
   const handleGenerateGrounding = async () => {
@@ -158,6 +194,63 @@ export const TicketDetailPage: React.FC = () => {
       setGroundingError(getApiErrorMessage(err, 'AI knowledge grounding is currently unavailable. Please try again later.'));
     } finally {
       setIsLoadingGrounding(false);
+    }
+  };
+
+  // Trigger AI SLA Risk & Escalation Analysis
+  const handleAnalyzeSLARisk = async () => {
+    if (!ticket || isLoadingRisk) return;
+    setIsLoadingRisk(true);
+    setRiskError(null);
+    try {
+      const response = await slaService.analyzeTicketSLARisk(ticket.id);
+      setSlaRiskAssessment(response.ai_risk_assessment);
+      if (response.sla_metrics) {
+        setSlaMetrics(response.sla_metrics);
+      }
+    } catch (err: unknown) {
+      setRiskError(getApiErrorMessage(err, 'AI SLA risk analysis is currently unavailable. Please try again later.'));
+    } finally {
+      setIsLoadingRisk(false);
+    }
+  };
+
+  // Approve Escalation
+  const handleApproveEscalation = async () => {
+    if (!ticket || !slaRiskAssessment || isSubmittingEscalation) return;
+    setIsSubmittingEscalation(true);
+    try {
+      const res = await slaService.approveTicketEscalation(ticket.id, {
+        recommendation_id: slaRiskAssessment.recommendation_id,
+        apply_priority: true,
+      });
+      setEscalationDecisionState('accepted');
+      setEscalationDecisionMessage(res.message);
+      if (res.applied_priority) {
+        setSelectedPriority(res.applied_priority as TicketPriority);
+      }
+      loadTicket();
+    } catch (err: unknown) {
+      setRiskError(getApiErrorMessage(err, 'Failed to approve escalation recommendation.'));
+    } finally {
+      setIsSubmittingEscalation(false);
+    }
+  };
+
+  // Reject Escalation
+  const handleRejectEscalation = async () => {
+    if (!ticket || !slaRiskAssessment || isSubmittingEscalation) return;
+    setIsSubmittingEscalation(true);
+    try {
+      const res = await slaService.rejectTicketEscalation(ticket.id, {
+        recommendation_id: slaRiskAssessment.recommendation_id,
+      });
+      setEscalationDecisionState('rejected');
+      setEscalationDecisionMessage(res.message);
+    } catch (err: unknown) {
+      setRiskError(getApiErrorMessage(err, 'Failed to reject escalation recommendation.'));
+    } finally {
+      setIsSubmittingEscalation(false);
     }
   };
 
@@ -209,6 +302,16 @@ export const TicketDetailPage: React.FC = () => {
     if (score >= 0.75) return 'High';
     if (score >= 0.4) return 'Medium';
     return 'Low';
+  };
+
+  const formatDuration = (seconds: number): string => {
+    if (seconds <= 0) return '0m';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hrs > 0) {
+      return `${hrs}h ${mins}m`;
+    }
+    return `${mins}m`;
   };
 
   const handleTriage = async () => {
@@ -977,6 +1080,185 @@ CONFIDENCE: ${Math.round(ticketSummary.confidence * 100)}%`;
             )}
           </div>
 
+          {/* Staff AI SLA Risk & Escalation Intelligence Card */}
+          {isStaff && (
+            <div className="ticket-ai-sla-risk-card glass-card">
+              <div className="ai-risk-header">
+                <div className="ai-risk-title-cluster">
+                  <div className="ai-risk-icon-wrapper">
+                    <Activity size={18} color="#f59e0b" />
+                  </div>
+                  <div>
+                    <h3 className="card-section-title">AI SLA Risk & Escalation Intelligence</h3>
+                    <p className="ai-risk-subtitle">
+                      Predictive breach analysis & advisory escalation recommendations (requires human review).
+                    </p>
+                  </div>
+                </div>
+
+                {!slaRiskAssessment && !isLoadingRisk && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm ai-risk-trigger-btn"
+                    onClick={handleAnalyzeSLARisk}
+                    disabled={isLoadingRisk}
+                  >
+                    <Sparkles size={14} />
+                    <span>Assess SLA Risk with AI</span>
+                  </button>
+                )}
+
+                {slaRiskAssessment && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleAnalyzeSLARisk}
+                    disabled={isLoadingRisk}
+                    title="Re-run SLA Risk Analysis"
+                  >
+                    <RotateCw size={14} className={isLoadingRisk ? 'spinner' : ''} />
+                    <span>Re-evaluate</span>
+                  </button>
+                )}
+              </div>
+
+              {riskError && (
+                <div className="alert alert-error" style={{ marginTop: '0.75rem' }}>
+                  <AlertCircle size={16} />
+                  <span>{riskError}</span>
+                </div>
+              )}
+
+              {isLoadingRisk && (
+                <div className="ai-risk-loading-box">
+                  <Loader2 size={24} className="spinner" color="#f59e0b" />
+                  <p>Analyzing ticket progression, elapsed SLA metrics, and breach probability...</p>
+                </div>
+              )}
+
+              {/* Assessment Body */}
+              {slaRiskAssessment && !isLoadingRisk && (
+                <div className="ai-risk-body">
+                  {/* Status & Prediction Bar */}
+                  <div className="ai-risk-status-bar">
+                    <span className={`risk-level-badge ${slaRiskAssessment.risk_level}`}>
+                      <AlertOctagon size={13} />
+                      <span>{slaRiskAssessment.risk_level.toUpperCase()} RISK</span>
+                    </span>
+
+                    <span className="risk-confidence-pill">
+                      {Math.round(slaRiskAssessment.confidence * 100)}% Confidence ({slaRiskAssessment.confidence_level})
+                    </span>
+
+                    {slaRiskAssessment.predicted_time_to_breach && (
+                      <span className="risk-time-pill">
+                        <Clock size={12} />
+                        <span>{slaRiskAssessment.predicted_time_to_breach}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Recommended Action & Advice */}
+                  <div className="risk-action-box">
+                    <h4 className="risk-section-label">Recommended Support Action</h4>
+                    <p className="risk-action-text">{slaRiskAssessment.recommended_action}</p>
+                  </div>
+
+                  {/* Contributing Risk Factors */}
+                  {slaRiskAssessment.risk_factors && slaRiskAssessment.risk_factors.length > 0 && (
+                    <div className="risk-factors-box">
+                      <h4 className="risk-section-label">Contributing Risk Factors</h4>
+                      <ul className="risk-factors-list">
+                        {slaRiskAssessment.risk_factors.map((factor, idx) => (
+                          <li key={idx}>
+                            <AlertCircle size={14} className="factor-icon" color="#f59e0b" />
+                            <span>{factor}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Escalation Recommendation & Human Review Box */}
+                  <div className={`escalation-review-card ${slaRiskAssessment.escalation_recommended ? 'recommended' : 'not-recommended'}`}>
+                    <div className="escalation-header-row">
+                      <div className="escalation-title-row">
+                        <ShieldAlert size={16} color={slaRiskAssessment.escalation_recommended ? '#ef4444' : '#10b981'} />
+                        <h4 className="escalation-card-title">
+                          {slaRiskAssessment.escalation_recommended
+                            ? `Escalation Recommended (${slaRiskAssessment.escalation_urgency.toUpperCase()} Urgency)`
+                            : 'No Immediate Escalation Required'}
+                        </h4>
+                      </div>
+                      <span className="human-review-tag">Advisory • Staff Approval Required</span>
+                    </div>
+
+                    {slaRiskAssessment.escalation_recommended && (
+                      <div className="escalation-details-grid">
+                        <div className="esc-detail-cell">
+                          <span className="esc-label">Recommended Priority</span>
+                          <span className="esc-val priority-tag" style={{ textTransform: 'uppercase' }}>
+                            {slaRiskAssessment.recommended_priority}
+                          </span>
+                        </div>
+                        <div className="esc-detail-cell">
+                          <span className="esc-label">Recommended Team</span>
+                          <span className="esc-val team-tag">{slaRiskAssessment.recommended_team}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Human Approval Decision State or Buttons */}
+                    {escalationDecisionState ? (
+                      <div className={`escalation-decision-result ${escalationDecisionState}`}>
+                        {escalationDecisionState === 'accepted' ? (
+                          <>
+                            <CheckCircle2 size={16} color="#34d399" />
+                            <span>{escalationDecisionMessage || 'Escalation accepted and priority updated.'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <X size={16} color="#94a3b8" />
+                            <span>{escalationDecisionMessage || 'Escalation recommendation rejected.'}</span>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="escalation-decision-actions">
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={handleApproveEscalation}
+                          disabled={isSubmittingEscalation}
+                        >
+                          {isSubmittingEscalation ? (
+                            <Loader2 size={14} className="spinner" />
+                          ) : (
+                            <CheckCircle size={14} />
+                          )}
+                          <span>Accept & Apply Escalation</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={handleRejectEscalation}
+                          disabled={isSubmittingEscalation}
+                        >
+                          {isSubmittingEscalation ? (
+                            <Loader2 size={14} className="spinner" />
+                          ) : (
+                            <X size={14} />
+                          )}
+                          <span>Reject Recommendation</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Activity / Timeline (Comments & Audit Events) */}
           <div className="ticket-activity-section glass-card">
             <div className="activity-section-header">
@@ -1244,6 +1526,85 @@ CONFIDENCE: ${Math.round(ticketSummary.confidence * 100)}%`;
 
         {/* Right Column: Staff Controls & Ticket Metadata */}
         <div className="ticket-sidebar-col">
+          {/* SLA Performance & Timeline Card */}
+          <div className="ticket-sla-card glass-card">
+            <div className="sidebar-card-header">
+              <Timer size={17} color="#38bdf8" />
+              <h3>SLA Performance & Target</h3>
+            </div>
+
+            {isLoadingSLA ? (
+              <div className="sla-card-loading">
+                <Loader2 size={18} className="spinner" color="#38bdf8" />
+                <span>Calculating SLA metrics...</span>
+              </div>
+            ) : slaMetrics ? (
+              <div className="sla-card-body">
+                {/* Status Bar */}
+                <div className="sla-status-row">
+                  <span className="sla-policy-tag">{slaMetrics.policy_name}</span>
+                  <span className={`sla-badge ${slaMetrics.sla_state.toLowerCase()}`}>
+                    {slaMetrics.sla_state.replace('_', ' ')}
+                  </span>
+                </div>
+
+                {/* Consumed Progress Bar */}
+                <div className="sla-progress-block">
+                  <div className="sla-progress-header">
+                    <span className="progress-label">Resolution SLA Consumed</span>
+                    <span className="progress-value">{slaMetrics.percentage_consumed}%</span>
+                  </div>
+                  <div className="sla-progress-track">
+                    <div
+                      className={`sla-progress-fill ${
+                        slaMetrics.is_breached
+                          ? 'breached'
+                          : slaMetrics.is_at_risk
+                          ? 'at-risk'
+                          : slaMetrics.sla_state === 'PAUSED'
+                          ? 'paused'
+                          : 'on-track'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(5, slaMetrics.percentage_consumed))}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Metrics Grid */}
+                <div className="sla-metrics-grid">
+                  <div className="sla-metric-cell">
+                    <span className="cell-label">First Response</span>
+                    <span className={`first-resp-badge ${slaMetrics.first_response_status}`}>
+                      {slaMetrics.first_response_status === 'met' && <CheckCircle size={12} />}
+                      {slaMetrics.first_response_status === 'breached' && <AlertOctagon size={12} />}
+                      {slaMetrics.first_response_status.toUpperCase()}
+                    </span>
+                    <span className="cell-sub">
+                      Target: {slaMetrics.target_first_response_hours}h
+                      {slaMetrics.first_response_elapsed_seconds !== null &&
+                        slaMetrics.first_response_elapsed_seconds !== undefined &&
+                        ` (${formatDuration(slaMetrics.first_response_elapsed_seconds)})`}
+                    </span>
+                  </div>
+
+                  <div className="sla-metric-cell">
+                    <span className="cell-label">Resolution Target</span>
+                    <span className="cell-val">
+                      {ticket.resolved_at ? 'Resolved' : formatDuration(slaMetrics.remaining_seconds) + ' left'}
+                    </span>
+                    <span className="cell-sub">
+                      Target: {slaMetrics.target_resolution_hours}h ({formatDuration(slaMetrics.resolution_elapsed_seconds)} elapsed)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="sla-card-empty">
+                <span>{slaError || 'SLA metrics unavailable.'}</span>
+              </div>
+            )}
+          </div>
+
           <div className="ticket-metadata-card glass-card">
             <div className="sidebar-card-header">
               <Sparkles size={17} color="#a78bfa" />

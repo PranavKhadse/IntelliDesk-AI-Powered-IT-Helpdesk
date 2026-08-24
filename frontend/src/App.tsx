@@ -13,6 +13,7 @@ import { TicketDetailPage } from './pages/TicketDetailPage';
 import { KBListPage } from './pages/KBListPage';
 import { KBDetailPage } from './pages/KBDetailPage';
 import { KBCreateEditPage } from './pages/KBCreateEditPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 
 export const App: React.FC = () => {
   return (
@@ -37,7 +38,7 @@ export const App: React.FC = () => {
             }
           />
 
-          {/* Authenticated Dashboard, Ticket & Knowledge Base Routes */}
+          {/* Authenticated Dashboard, Analytics, Ticket & Knowledge Base Routes */}
           <Route
             element={
               <ProtectedRoute>
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
           >
             <Route path="/" element={<DashboardPage />} />
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/tickets" element={<TicketsListPage />} />
             <Route path="/tickets/new" element={<CreateTicketPage />} />
             <Route path="/tickets/:ticketId" element={<TicketDetailPage />} />

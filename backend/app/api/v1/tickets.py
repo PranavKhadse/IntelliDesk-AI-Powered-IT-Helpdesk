@@ -17,6 +17,12 @@ from app.schemas.ai_summary import TicketSummaryResponse
 from app.schemas.response_draft import ResponseDraft
 from app.schemas.triage import TicketTriageRecommendation, TriageDecisionRequest, TriageDecisionResponse
 from app.schemas.ai_grounding import GroundedArticleReference, TicketGroundingResponse
+from app.schemas.sla import (
+    TicketSLAResponse,
+    TicketAIRiskResponse,
+    EscalationDecisionRequest,
+    EscalationDecisionResponse,
+)
 from app.services.ticket_service import (
     create_ticket, get_ticket_by_id, list_tickets, update_ticket, add_ticket_comment
 )
@@ -32,6 +38,12 @@ from app.services.triage_service import (
 )
 from app.services.kb_service import get_relevant_articles_for_ticket
 from app.services.grounding_service import generate_grounded_ticket_recommendation
+from app.services.sla_service import get_ticket_sla_response
+from app.services.sla_risk_service import (
+    generate_ticket_sla_risk,
+    approve_ticket_escalation,
+    reject_ticket_escalation,
+)
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
@@ -241,5 +253,52 @@ def post_comment(
 ):
     """Add a public comment or internal agent note to a ticket."""
     return add_ticket_comment(db, ticket_id, req, current_user)
+
+
+@router.get("/{ticket_id}/sla", response_model=TicketSLAResponse)
+def get_ticket_sla_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve system-calculated ground-truth SLA metrics for a ticket (Owner or Staff)."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    return get_ticket_sla_response(db, ticket, current_user)
+
+
+@router.post("/{ticket_id}/ai-sla-risk", response_model=TicketAIRiskResponse)
+def analyze_ticket_sla_risk_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate AI SLA risk assessment and escalation recommendations for support staff (Agent/Admin only)."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    return generate_ticket_sla_risk(db, ticket, current_user, get_ai_service())
+
+
+@router.post("/{ticket_id}/ai-sla-risk/approve", response_model=EscalationDecisionResponse)
+def approve_ticket_escalation_endpoint(
+    ticket_id: str,
+    req: EscalationDecisionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Approve an AI escalation recommendation and apply recommended priority (Agent/Admin only)."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    return approve_ticket_escalation(db, ticket, current_user, req)
+
+
+@router.post("/{ticket_id}/ai-sla-risk/reject", response_model=EscalationDecisionResponse)
+def reject_ticket_escalation_endpoint(
+    ticket_id: str,
+    req: EscalationDecisionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Reject an AI escalation recommendation without mutating the ticket (Agent/Admin only)."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    return reject_ticket_escalation(db, ticket, current_user, req)
+
 
 
