@@ -13,13 +13,16 @@ from app.schemas.ticket import (
 )
 from app.core.exceptions import ForbiddenError
 from app.schemas.comment import CommentCreate, CommentResponse
+from app.schemas.ai_summary import TicketSummaryResponse
 from app.schemas.response_draft import ResponseDraft
 from app.schemas.triage import TicketTriageRecommendation, TriageDecisionRequest, TriageDecisionResponse
+from app.schemas.ai_grounding import GroundedArticleReference, TicketGroundingResponse
 from app.services.ticket_service import (
     create_ticket, get_ticket_by_id, list_tickets, update_ticket, add_ticket_comment
 )
 from app.services.ai_service import get_ai_service
 from app.services.response_draft_service import generate_response_draft
+from app.services.summary_service import generate_ticket_summary
 from app.services.triage_service import (
     approve_ticket_triage,
     build_ticket_triage_input,
@@ -27,6 +30,8 @@ from app.services.triage_service import (
     reject_ticket_triage,
     store_ticket_triage,
 )
+from app.services.kb_service import get_relevant_articles_for_ticket
+from app.services.grounding_service import generate_grounded_ticket_recommendation
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
@@ -191,6 +196,42 @@ def draft_ticket_response_endpoint(
     return generate_response_draft(ticket, get_ai_service())
 
 
+@router.post("/{ticket_id}/ai-summary", response_model=TicketSummaryResponse)
+def summarize_ticket_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate an AI ticket summary and action insights for support staff (Agent/Admin only)."""
+    if current_user.role not in [UserRole.AGENT, UserRole.ADMIN]:
+        raise ForbiddenError("Only support staff can generate AI ticket summaries.")
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    return generate_ticket_summary(ticket, get_ai_service())
+
+
+@router.get("/{ticket_id}/kb-matches", response_model=List[GroundedArticleReference])
+def get_ticket_kb_matches(
+    ticket_id: str,
+    limit: int = Query(5, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve published KB articles relevant to this ticket."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    return get_relevant_articles_for_ticket(db, ticket, limit=limit, min_score=0.20)
+
+
+@router.post("/{ticket_id}/ai-grounding", response_model=TicketGroundingResponse)
+def ground_ticket_recommendation_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate an AI recommendation grounded strictly in verified KB articles."""
+    ticket = get_ticket_by_id(db, ticket_id, current_user)
+    return generate_grounded_ticket_recommendation(ticket, db, get_ai_service())
+
+
 @router.post("/{ticket_id}/comments", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
 def post_comment(
     ticket_id: str,
@@ -200,3 +241,5 @@ def post_comment(
 ):
     """Add a public comment or internal agent note to a ticket."""
     return add_ticket_comment(db, ticket_id, req, current_user)
+
+

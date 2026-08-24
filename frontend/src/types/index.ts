@@ -108,6 +108,17 @@ export interface AIResponseDraft {
   confidence: number;
 }
 
+export interface TicketSummary {
+  summary: string;
+  customer_issue: string;
+  important_facts: string[];
+  actions_taken: string[];
+  suggested_next_steps: string[];
+  missing_information: string[];
+  risk_flags: string[];
+  confidence: number;
+}
+
 export interface TicketListResponse {
   items: Ticket[];
   total: number;
@@ -154,3 +165,102 @@ export interface TicketFilterParams {
   search?: string;
   assigned_to_me?: boolean;
 }
+
+export interface KBArticleAuthorSummary {
+  id: string;
+  full_name: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface KBArticleCategorySummary {
+  id: number;
+  name: string;
+}
+
+export interface KBArticle {
+  id: string;
+  title: string;
+  slug: string;
+  summary?: string;
+  content: string;
+  category_id?: number;
+  category?: KBArticleCategorySummary;
+  author_id?: string;
+  author?: KBArticleAuthorSummary;
+  is_published: boolean;
+  tags: string;
+  view_count: number;
+  helpful_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KBArticleListResponse {
+  items: KBArticle[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface KBArticleCreatePayload {
+  title: string;
+  summary?: string;
+  content: string;
+  category_id?: number;
+  is_published?: boolean;
+  tags?: string;
+  slug?: string;
+}
+
+export interface KBArticleUpdatePayload {
+  title?: string;
+  summary?: string;
+  content?: string;
+  category_id?: number;
+  is_published?: boolean;
+  tags?: string;
+  slug?: string;
+}
+
+export interface KBSearchResultItem {
+  id: string;
+  title: string;
+  slug: string;
+  summary?: string;
+  category?: string;
+  tags: string;
+  relevance_score: number;
+  snippet: string;
+}
+
+export interface KBSearchResponse {
+  query: string;
+  items: KBSearchResultItem[];
+  total: number;
+}
+
+export type GroundingStatus = 'grounded' | 'partially_grounded' | 'no_match';
+
+export interface GroundedArticleReference {
+  article_id: string;
+  slug: string;
+  title: string;
+  category?: string;
+  relevance_score: number;
+  snippet: string;
+}
+
+export interface TicketGroundingResponse {
+  ticket_id: string;
+  ticket_number: string;
+  grounding_status: GroundingStatus;
+  recommendation: string;
+  key_points: string[];
+  sources: GroundedArticleReference[];
+  confidence: number;
+  reasoning?: string;
+  no_match_reason?: string;
+}
+

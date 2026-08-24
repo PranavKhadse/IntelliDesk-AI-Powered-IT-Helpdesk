@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ticketService } from '../services/ticketService';
+import { kbService } from '../services/kbService';
 import { getApiErrorMessage } from '../services/api';
 import type {
   TicketDetail,
@@ -12,6 +13,9 @@ import type {
   CommentType,
   TicketTriageRecommendation,
   AIResponseDraft,
+  TicketSummary,
+  GroundedArticleReference,
+  TicketGroundingResponse,
 } from '../types';
 import {
   ArrowLeft,
@@ -30,12 +34,16 @@ import {
   Save,
   X,
   CheckCircle,
+  CheckCircle2,
   Sparkles,
   Copy,
   Check,
   RotateCw,
   FileText,
   Bot,
+  BookOpen,
+  ExternalLink,
+  HelpCircle,
 } from 'lucide-react';
 
 export const TicketDetailPage: React.FC = () => {
@@ -53,6 +61,12 @@ export const TicketDetailPage: React.FC = () => {
   const [commentType, setCommentType] = useState<CommentType>('public');
   const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+
+  // AI Summary state (staff-only)
+  const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState<boolean>(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
 
   // AI Response Draft state (staff-only)
   const [responseDraft, setResponseDraft] = useState<AIResponseDraft | null>(null);
@@ -83,9 +97,29 @@ export const TicketDetailPage: React.FC = () => {
   const [editDescription, setEditDescription] = useState<string>('');
   const [isSavingContent, setIsSavingContent] = useState<boolean>(false);
 
+  // AI Grounding & Knowledge Base Matching state
+  const [groundingResponse, setGroundingResponse] = useState<TicketGroundingResponse | null>(null);
+  const [isLoadingGrounding, setIsLoadingGrounding] = useState<boolean>(false);
+  const [groundingError, setGroundingError] = useState<string | null>(null);
+  const [matchedArticles, setMatchedArticles] = useState<GroundedArticleReference[]>([]);
+  const [isLoadingMatches, setIsLoadingMatches] = useState<boolean>(false);
+
   const isStaff = user?.role === 'agent' || user?.role === 'admin';
   const isCreator = user?.id === ticket?.creator_id;
   const canUserEdit = isCreator && user?.role === 'user' && ticket?.status === 'open';
+
+  // Load relevant published KB articles matching the ticket
+  const loadKBMatches = useCallback(async (ticketIdToFetch: string) => {
+    setIsLoadingMatches(true);
+    try {
+      const matches = await kbService.getTicketKBMatches(ticketIdToFetch);
+      setMatchedArticles(matches);
+    } catch (err) {
+      console.error('Failed to load KB matches:', err);
+    } finally {
+      setIsLoadingMatches(false);
+    }
+  }, []);
 
   // Load ticket details
   const loadTicket = useCallback(async () => {
@@ -102,6 +136,7 @@ export const TicketDetailPage: React.FC = () => {
       setSelectedCategory(data.category_id ? String(data.category_id) : '');
       setEditTitle(data.title);
       setEditDescription(data.description);
+      loadKBMatches(data.id);
     } catch (err: unknown) {
       console.error('Failed to load ticket:', err);
       const msg = getApiErrorMessage(err, 'Failed to retrieve ticket details.');
@@ -109,7 +144,22 @@ export const TicketDetailPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [ticketId]);
+  }, [ticketId, loadKBMatches]);
+
+  // Trigger AI Grounding
+  const handleGenerateGrounding = async () => {
+    if (!ticket || isLoadingGrounding) return;
+    setIsLoadingGrounding(true);
+    setGroundingError(null);
+    try {
+      const response = await kbService.getTicketGrounding(ticket.id);
+      setGroundingResponse(response);
+    } catch (err: unknown) {
+      setGroundingError(getApiErrorMessage(err, 'AI knowledge grounding is currently unavailable. Please try again later.'));
+    } finally {
+      setIsLoadingGrounding(false);
+    }
+  };
 
   useEffect(() => {
     loadTicket();
@@ -200,6 +250,57 @@ export const TicketDetailPage: React.FC = () => {
       setTriageError(getApiErrorMessage(err, 'Unable to record the recommendation decision.'));
     } finally {
       setIsSubmittingTriageDecision(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    if (!ticket || isLoadingSummary) return;
+
+    setIsLoadingSummary(true);
+    setSummaryError(null);
+    try {
+      const summary = await ticketService.getTicketSummary(ticket.id);
+      setTicketSummary(summary);
+    } catch (err: unknown) {
+      setSummaryError(getApiErrorMessage(err, 'AI ticket summarization is currently unavailable. Please try again later.'));
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  };
+
+  const handleCopySummary = async () => {
+    if (!ticketSummary) return;
+    try {
+      const textToCopy = `TICKET SUMMARY: ${ticket?.ticket_number || ''} - ${ticket?.title || ''}
+--------------------------------------------------
+SUMMARY:
+${ticketSummary.summary}
+
+CUSTOMER ISSUE:
+${ticketSummary.customer_issue}
+
+IMPORTANT FACTS:
+${ticketSummary.important_facts.map((fact) => `• ${fact}`).join('\n')}
+
+ACTIONS TAKEN:
+${ticketSummary.actions_taken.map((action) => `• ${action}`).join('\n')}
+
+SUGGESTED NEXT STEPS:
+${ticketSummary.suggested_next_steps.map((step) => `• ${step}`).join('\n')}
+
+MISSING INFORMATION:
+${ticketSummary.missing_information && ticketSummary.missing_information.length > 0 ? ticketSummary.missing_information.map((info) => `• ${info}`).join('\n') : '• None'}
+
+RISK FLAGS:
+${ticketSummary.risk_flags && ticketSummary.risk_flags.length > 0 ? ticketSummary.risk_flags.map((risk) => `• ${risk}`).join('\n') : '• None'}
+
+CONFIDENCE: ${Math.round(ticketSummary.confidence * 100)}%`;
+
+      await navigator.clipboard.writeText(textToCopy);
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2500);
+    } catch (err) {
+      console.error('Failed to copy summary to clipboard', err);
     }
   };
 
@@ -470,6 +571,409 @@ export const TicketDetailPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Staff AI Ticket Summary & Action Insights */}
+          {isStaff && (
+            <div className="ticket-ai-summary-card glass-card">
+              <div className="ai-summary-card-header">
+                <div className="ai-summary-title-cluster">
+                  <div className="ai-summary-icon-wrapper">
+                    <Sparkles size={18} color="#38bdf8" />
+                  </div>
+                  <div>
+                    <h3 className="card-section-title">AI Summary & Action Insights</h3>
+                    <p className="ai-summary-subtitle">
+                      Grounded conversation overview, key facts, actions taken, and risk flags for staff.
+                    </p>
+                  </div>
+                </div>
+
+                {!ticketSummary && !isLoadingSummary && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm ai-summary-trigger-btn"
+                    onClick={handleGenerateSummary}
+                    disabled={isLoadingSummary}
+                  >
+                    <Sparkles size={14} color="#38bdf8" />
+                    <span>Generate Summary</span>
+                  </button>
+                )}
+
+                {ticketSummary && (
+                  <div className="ai-summary-header-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleCopySummary}
+                      title="Copy full summary to clipboard"
+                    >
+                      {copiedSummary ? (
+                        <>
+                          <Check size={14} color="#10b981" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} />
+                          <span>Copy Summary</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleGenerateSummary}
+                      disabled={isLoadingSummary}
+                      title="Regenerate summary"
+                    >
+                      <RotateCw size={14} className={isLoadingSummary ? 'spinner' : ''} />
+                      <span>Regenerate</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {summaryError && (
+                <div className="alert alert-error" style={{ marginTop: '0.75rem' }}>
+                  <AlertCircle size={16} />
+                  <span>{summaryError}</span>
+                </div>
+              )}
+
+              {isLoadingSummary && (
+                <div className="ai-summary-loading-box">
+                  <Loader2 size={24} className="spinner" color="#38bdf8" />
+                  <p>Analyzing conversation, public comments, and history...</p>
+                </div>
+              )}
+
+              {ticketSummary && !isLoadingSummary && (
+                <div className="ai-summary-body">
+                  {/* Badges Bar */}
+                  <div className="ai-summary-badge-bar">
+                    <span className="ai-summary-pill">AI SUMMARY</span>
+                    <span className="ai-summary-confidence-pill">
+                      {Math.round(ticketSummary.confidence * 100)}% Confidence ({getConfidenceLabel(ticketSummary.confidence)})
+                    </span>
+                  </div>
+
+                  {/* Executive Summary */}
+                  <div className="ai-summary-lead-box">
+                    <h4 className="ai-summary-section-label">Summary</h4>
+                    <p className="ai-summary-lead-text">{ticketSummary.summary}</p>
+                  </div>
+
+                  {/* Customer Issue */}
+                  <div className="ai-summary-issue-box">
+                    <h4 className="ai-summary-section-label">Customer Issue</h4>
+                    <p className="ai-summary-issue-text">{ticketSummary.customer_issue}</p>
+                  </div>
+
+                  {/* 2-Column Insights Grid */}
+                  <div className="ai-summary-insights-grid">
+                    {/* Important Facts */}
+                    <div className="ai-insight-panel">
+                      <h4 className="ai-insight-panel-title">Important Facts</h4>
+                      {ticketSummary.important_facts && ticketSummary.important_facts.length > 0 ? (
+                        <ul className="ai-insight-list">
+                          {ticketSummary.important_facts.map((fact, idx) => (
+                            <li key={idx}>{fact}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="ai-insight-empty">No specific facts reported.</p>
+                      )}
+                    </div>
+
+                    {/* Actions Taken */}
+                    <div className="ai-insight-panel">
+                      <h4 className="ai-insight-panel-title">Actions Already Taken</h4>
+                      {ticketSummary.actions_taken && ticketSummary.actions_taken.length > 0 ? (
+                        <ul className="ai-insight-list">
+                          {ticketSummary.actions_taken.map((action, idx) => (
+                            <li key={idx}>{action}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="ai-insight-empty">No prior actions documented yet.</p>
+                      )}
+                    </div>
+
+                    {/* Suggested Next Steps */}
+                    <div className="ai-insight-panel">
+                      <h4 className="ai-insight-panel-title">Suggested Next Steps</h4>
+                      {ticketSummary.suggested_next_steps && ticketSummary.suggested_next_steps.length > 0 ? (
+                        <ul className="ai-insight-list next-steps-list">
+                          {ticketSummary.suggested_next_steps.map((step, idx) => (
+                            <li key={idx}>{step}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="ai-insight-empty">No specific next steps suggested.</p>
+                      )}
+                    </div>
+
+                    {/* Missing Information */}
+                    <div className="ai-insight-panel">
+                      <h4 className="ai-insight-panel-title">Missing Information</h4>
+                      {ticketSummary.missing_information && ticketSummary.missing_information.length > 0 ? (
+                        <ul className="ai-insight-list missing-info-list">
+                          {ticketSummary.missing_information.map((item, idx) => (
+                            <li key={idx}>{item}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="ai-insight-empty text-muted">All necessary information appears to be present.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Risk Flags */}
+                  {ticketSummary.risk_flags && ticketSummary.risk_flags.length > 0 && (
+                    <div className="ai-summary-risks-box">
+                      <div className="ai-risk-heading-row">
+                        <Flag size={15} color="#f87171" />
+                        <h4 className="ai-risk-title">Identified Risk Flags</h4>
+                      </div>
+                      <div className="ai-risk-tags-cluster">
+                        {ticketSummary.risk_flags.map((flag, idx) => (
+                          <div key={idx} className="ai-risk-tag">
+                            <span className="risk-tag-bullet">⚠️</span>
+                            <span>{flag}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bottom Action Footer */}
+                  <div className="ai-summary-footer-bar">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleCopySummary}
+                    >
+                      {copiedSummary ? (
+                        <>
+                          <Check size={14} color="#10b981" />
+                          <span>Copied to Clipboard!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} />
+                          <span>Copy Summary</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleGenerateSummary}
+                      disabled={isLoadingSummary}
+                    >
+                      <RotateCw size={14} className={isLoadingSummary ? 'spinner' : ''} />
+                      <span>Regenerate Summary</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Knowledge Base AI Grounding & Verified Sources Card */}
+          <div className="ticket-ai-grounding-card glass-card">
+            <div className="ai-grounding-header">
+              <div className="ai-grounding-title-cluster">
+                <div className="ai-grounding-icon-wrapper">
+                  <BookOpen size={18} color="#38bdf8" />
+                </div>
+                <div>
+                  <h3 className="card-section-title">Knowledge Base Grounding & Verified Solutions</h3>
+                  <p className="ai-grounding-subtitle">
+                    AI recommendation strictly grounded in published knowledge base articles with verified citations.
+                  </p>
+                </div>
+              </div>
+
+              {!groundingResponse && !isLoadingGrounding && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm ai-grounding-trigger-btn"
+                  onClick={handleGenerateGrounding}
+                  disabled={isLoadingGrounding}
+                >
+                  <Sparkles size={14} />
+                  <span>Ground Solution with AI</span>
+                </button>
+              )}
+
+              {groundingResponse && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleGenerateGrounding}
+                  disabled={isLoadingGrounding}
+                  title="Regenerate grounded recommendation"
+                >
+                  <RotateCw size={14} className={isLoadingGrounding ? 'spinner' : ''} />
+                  <span>Regenerate</span>
+                </button>
+              )}
+            </div>
+
+            {groundingError && (
+              <div className="alert alert-error" style={{ marginTop: '0.75rem' }}>
+                <AlertCircle size={16} />
+                <span>{groundingError}</span>
+              </div>
+            )}
+
+            {isLoadingGrounding && (
+              <div className="ai-grounding-loading-box">
+                <Loader2 size={24} className="spinner" color="#38bdf8" />
+                <p>Retrieving published knowledge articles and synthesizing verified solution...</p>
+              </div>
+            )}
+
+            {/* When Grounding Response is available */}
+            {groundingResponse && !isLoadingGrounding && (
+              <div className="ai-grounding-body">
+                {/* Status Badges Bar */}
+                <div className="ai-grounding-status-bar">
+                  {groundingResponse.grounding_status === 'grounded' && (
+                    <span className="grounding-badge grounded">
+                      <CheckCircle2 size={14} />
+                      <span>Grounded in Verified KB</span>
+                    </span>
+                  )}
+                  {groundingResponse.grounding_status === 'partially_grounded' && (
+                    <span className="grounding-badge partially-grounded">
+                      <AlertCircle size={14} />
+                      <span>Partially Grounded</span>
+                    </span>
+                  )}
+                  {groundingResponse.grounding_status === 'no_match' && (
+                    <span className="grounding-badge no-match">
+                      <HelpCircle size={14} />
+                      <span>No Reliable KB Match</span>
+                    </span>
+                  )}
+
+                  {groundingResponse.confidence > 0 && (
+                    <span className="grounding-confidence-pill">
+                      {Math.round(groundingResponse.confidence * 100)}% Confidence
+                    </span>
+                  )}
+                </div>
+
+                {/* No Match State Explanation */}
+                {groundingResponse.grounding_status === 'no_match' ? (
+                  <div className="grounding-no-match-box">
+                    <div className="no-match-icon-circle">
+                      <HelpCircle size={20} color="#94a3b8" />
+                    </div>
+                    <div className="no-match-text-col">
+                      <h4 className="no-match-title">No Reliable Knowledge Match</h4>
+                      <p className="no-match-desc">{groundingResponse.recommendation}</p>
+                      {groundingResponse.no_match_reason && (
+                        <p className="no-match-reason">Note: {groundingResponse.no_match_reason}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* Grounded / Partially Grounded Content */
+                  <>
+                    {/* Recommendation Box */}
+                    <div className="grounding-recommendation-box">
+                      <h4 className="grounding-section-label">Grounded Guidance</h4>
+                      <p className="grounding-recommendation-text">{groundingResponse.recommendation}</p>
+                    </div>
+
+                    {/* Key Solution Steps / Points */}
+                    {groundingResponse.key_points && groundingResponse.key_points.length > 0 && (
+                      <div className="grounding-key-points-box">
+                        <h4 className="grounding-section-label">Verified Action Steps</h4>
+                        <ul className="grounding-points-list">
+                          {groundingResponse.key_points.map((point, idx) => (
+                            <li key={idx}>
+                              <CheckCircle size={14} className="point-icon" color="#10b981" />
+                              <span>{point}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Verified Sources / Citations */}
+                    {groundingResponse.sources && groundingResponse.sources.length > 0 && (
+                      <div className="grounding-sources-box">
+                        <h4 className="grounding-section-label">Cited Knowledge Base Sources</h4>
+                        <div className="grounding-sources-grid">
+                          {groundingResponse.sources.map((source) => (
+                            <div key={source.article_id} className="grounding-source-card">
+                              <div className="source-card-top">
+                                <Link
+                                  to={`/kb/${source.slug || source.article_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="source-title-link"
+                                >
+                                  <span>{source.title}</span>
+                                  <ExternalLink size={13} />
+                                </Link>
+                                <span className="source-match-badge">
+                                  {Math.round(source.relevance_score * 100)}% Match
+                                </span>
+                              </div>
+                              {source.category && (
+                                <span className="source-category-tag">{source.category}</span>
+                              )}
+                              <p className="source-snippet">{source.snippet}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Initial preview of matched KB articles when grounding has not been generated yet */}
+            {!groundingResponse && !isLoadingGrounding && (
+              isLoadingMatches ? (
+                <div className="kb-matched-preview-box">
+                  <div className="matched-preview-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Loader2 size={14} className="spinner" color="#38bdf8" />
+                    <span className="preview-label">Checking for relevant knowledge articles...</span>
+                  </div>
+                </div>
+              ) : matchedArticles.length > 0 ? (
+                <div className="kb-matched-preview-box">
+                  <div className="matched-preview-header">
+                    <span className="preview-label">Found {matchedArticles.length} Related Articles in Knowledge Base:</span>
+                  </div>
+                  <div className="preview-articles-list">
+                    {matchedArticles.map((art) => (
+                      <Link
+                        key={art.article_id}
+                        to={`/kb/${art.slug || art.article_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="preview-article-row"
+                      >
+                        <BookOpen size={14} color="#38bdf8" />
+                        <span className="preview-article-title">{art.title}</span>
+                        <span className="preview-article-score">{Math.round(art.relevance_score * 100)}% relevant</span>
+                        <ExternalLink size={12} className="preview-ext-icon" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null
             )}
           </div>
 

@@ -6,6 +6,15 @@ from app.schemas.ticket import (
     CommentSummary, AuditLogSummary
 )
 from app.schemas.comment import CommentCreate, CommentResponse
+from app.schemas.ai_summary import ProviderTicketSummary, TicketSummaryResponse
+from app.schemas.kb_article import (
+    KBArticleAuthorSummary, KBArticleCategorySummary,
+    KBArticleCreate, KBArticleUpdate, KBArticleResponse, KBArticleListResponse,
+    KBSearchResultItem, KBSearchResponse
+)
+from app.schemas.ai_grounding import (
+    GroundingStatus, GroundedArticleReference, ProviderGroundingResult, TicketGroundingResponse
+)
 
 __all__ = [
     "LoginRequest",
@@ -29,4 +38,18 @@ __all__ = [
     "AuditLogSummary",
     "CommentCreate",
     "CommentResponse",
+    "ProviderTicketSummary",
+    "TicketSummaryResponse",
+    "KBArticleAuthorSummary",
+    "KBArticleCategorySummary",
+    "KBArticleCreate",
+    "KBArticleUpdate",
+    "KBArticleResponse",
+    "KBArticleListResponse",
+    "KBSearchResultItem",
+    "KBSearchResponse",
+    "GroundingStatus",
+    "GroundedArticleReference",
+    "ProviderGroundingResult",
+    "TicketGroundingResponse",
 ]

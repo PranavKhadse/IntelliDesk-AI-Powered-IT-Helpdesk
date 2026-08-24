@@ -12,6 +12,7 @@ import type {
   TicketFilterParams,
   TicketTriageRecommendation,
   AIResponseDraft,
+  TicketSummary,
 } from '../types';
 
 export const ticketService = {
@@ -84,6 +85,14 @@ export const ticketService = {
    */
   async getResponseDraft(ticketId: string): Promise<AIResponseDraft> {
     const res = await apiClient.post<AIResponseDraft>(`/tickets/${ticketId}/ai-response-draft`);
+    return res.data;
+  },
+
+  /**
+   * Request an AI ticket summary and action insights for support staff (Agent/Admin only).
+   */
+  async getTicketSummary(ticketId: string): Promise<TicketSummary> {
+    const res = await apiClient.post<TicketSummary>(`/tickets/${ticketId}/ai-summary`);
     return res.data;
   },
 

@@ -10,6 +10,9 @@ import { DashboardPage } from './pages/DashboardPage';
 import { TicketsListPage } from './pages/TicketsListPage';
 import { CreateTicketPage } from './pages/CreateTicketPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
+import { KBListPage } from './pages/KBListPage';
+import { KBDetailPage } from './pages/KBDetailPage';
+import { KBCreateEditPage } from './pages/KBCreateEditPage';
 
 export const App: React.FC = () => {
   return (
@@ -34,7 +37,7 @@ export const App: React.FC = () => {
             }
           />
 
-          {/* Authenticated Dashboard & Ticket Management Routes */}
+          {/* Authenticated Dashboard, Ticket & Knowledge Base Routes */}
           <Route
             element={
               <ProtectedRoute>
@@ -47,6 +50,12 @@ export const App: React.FC = () => {
             <Route path="/tickets" element={<TicketsListPage />} />
             <Route path="/tickets/new" element={<CreateTicketPage />} />
             <Route path="/tickets/:ticketId" element={<TicketDetailPage />} />
+            
+            {/* Knowledge Base Routes */}
+            <Route path="/kb" element={<KBListPage />} />
+            <Route path="/kb/new" element={<KBCreateEditPage />} />
+            <Route path="/kb/:articleIdOrSlug" element={<KBDetailPage />} />
+            <Route path="/kb/:articleIdOrSlug/edit" element={<KBCreateEditPage />} />
           </Route>
 
           {/* Fallback */}

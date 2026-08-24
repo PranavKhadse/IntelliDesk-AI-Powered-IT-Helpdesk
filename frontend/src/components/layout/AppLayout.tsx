@@ -13,6 +13,7 @@ import {
   User,
   Shield,
   Headphones,
+  BookOpen,
 } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
@@ -113,6 +114,14 @@ export const AppLayout: React.FC = () => {
             </NavLink>
 
             <NavLink
+              to="/kb"
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            >
+              <BookOpen size={17} />
+              <span>Knowledge Base</span>
+            </NavLink>
+
+            <NavLink
               to="/tickets/new"
               className={({ isActive }) => `nav-link create-link ${isActive ? 'active' : ''}`}
             >
@@ -198,6 +207,15 @@ export const AppLayout: React.FC = () => {
           >
             <Ticket size={18} />
             <span>My Tickets</span>
+          </NavLink>
+
+          <NavLink
+            to="/kb"
+            className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <BookOpen size={18} />
+            <span>Knowledge Base</span>
           </NavLink>
 
           <NavLink
