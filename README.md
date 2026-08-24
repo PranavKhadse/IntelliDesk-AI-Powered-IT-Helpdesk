@@ -71,49 +71,99 @@
 
 ## 🏗 System Architecture
 
-```mermaid
-flowchart TD
-    subgraph Frontend["Frontend Client (React + TypeScript + Vite)"]
-        UI[AppLayout & Protected Routes]
-        TList[Tickets & Detail Pages]
-        KB[Knowledge Base Portal]
-        Analytics[Operations Dashboard]
-    end
-
-    subgraph API["FastAPI Backend (/api/v1)"]
-        AuthRouter["/auth (JWT Authentication)"]
-        TicketRouter["/tickets (CRUD & Comments)"]
-        KBRouter["/kb (Knowledge Base)"]
-        SLARouter["/sla (SLA Policies)"]
-        AnalyticsRouter["/analytics (Aggregations)"]
-    end
-
-    subgraph CoreServices["Services & AI Intelligence Layer"]
-        AuthService[auth_service.py]
-        TicketService[ticket_service.py]
-        SLAService[sla_service.py (Policy Engine)]
-        AnalyticsService[analytics_service.py]
-        Sanitizer[Secret Sanitizer & Notes Excluder]
-        AIService[ai_service.py (OpenAI Compatible)]
-    end
-
-    subgraph Storage["PostgreSQL Database"]
-        DB_Users[(users)]
-        DB_Tickets[(tickets)]
-        DB_Comments[(ticket_comments)]
-        DB_Audit[(audit_logs)]
-        DB_KB[(kb_articles)]
-        DB_SLA[(sla_policies)]
-        DB_Cats[(categories)]
-    end
-
-    UI --> API
-    API --> CoreServices
-    CoreServices --> Storage
-    CoreServices --> Sanitizer --> AIService
-```
-
----
+                         ┌─────────────────────────────┐
+                         │            USERS            │
+                         │                             │
+                         │  Customer   Agent   Admin   │
+                         └──────────────┬──────────────┘
+                                        │
+                                        ▼
+              ┌──────────────────────────────────────────┐
+              │              PRESENTATION LAYER          │
+              │                                          │
+              │        React + TypeScript + Vite         │
+              │                                          │
+              │  Login │ Dashboard │ Tickets │ KB       │
+              │  AI Assistant │ SLA │ Analytics          │
+              └────────────────────┬─────────────────────┘
+                                   │
+                                   │ HTTPS / REST API
+                                   ▼
+              ┌──────────────────────────────────────────┐
+              │                 API LAYER                │
+              │                                          │
+              │                  FastAPI                 │
+              │                                          │
+              │  Authentication │ Users │ Tickets       │
+              │  Comments │ Knowledge Base │ SLA        │
+              │  AI │ Analytics                             │
+              └────────────────────┬─────────────────────┘
+                                   │
+                                   ▼
+              ┌──────────────────────────────────────────┐
+              │            SECURITY & ACCESS             │
+              │                                          │
+              │       JWT Authentication                 │
+              │       Role-Based Access Control           │
+              │                                          │
+              │     USER │ AGENT │ ADMIN                 │
+              └────────────────────┬─────────────────────┘
+                                   │
+                                   ▼
+        ┌────────────────────────────────────────────────────────┐
+        │                  APPLICATION LAYER                      │
+        │                                                        │
+        │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐ │
+        │  │ Ticket       │  │ Knowledge    │  │ SLA &       │ │
+        │  │ Management   │  │ Base        │  │ Escalation  │ │
+        │  └──────────────┘  └──────────────┘  └─────────────┘ │
+        │                                                        │
+        │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐ │
+        │  │ AI           │  │ Audit        │  │ Operations  │ │
+        │  │ Intelligence │  │ Logging      │  │ Analytics   │ │
+        │  └──────────────┘  └──────────────┘  └─────────────┘ │
+        └────────────────────────┬───────────────────────────────┘
+                                 │
+                  ┌──────────────┴──────────────┐
+                  │                             │
+                  ▼                             ▼
+      ┌────────────────────────┐    ┌────────────────────────┐
+      │     AI INTELLIGENCE    │    │    KNOWLEDGE / SLA     │
+      │                        │    │                        │
+      │ • AI Triage            │    │ • KB Search             │
+      │ • AI Summary           │    │ • AI Grounding          │
+      │ • Response Draft       │    │ • SLA Policy Engine     │
+      │ • SLA Risk Analysis    │    │ • Escalation Engine     │
+      │                        │    │ • Human Approval        │
+      └────────────┬───────────┘    └────────────┬───────────┘
+                   │                             │
+                   ▼                             │
+          ┌───────────────────┐                  │
+          │   EXTERNAL LLM    │                  │
+          │   AI PROVIDER      │                  │
+          └───────────────────┘                  │
+                                                 │
+                         ┌───────────────────────┘
+                         │
+                         ▼
+              ┌──────────────────────────────────┐
+              │             DATA LAYER            │
+              │                                  │
+              │        SQLAlchemy ORM            │
+              │              │                   │
+              │              ▼                   │
+              │      Relational Database         │
+              │                                  │
+              │  Users │ Tickets │ Comments      │
+              │  KB │ SLA Policies │ Audit Logs  │
+              └────────────────┬─────────────────┘
+                               │
+                 ┌─────────────┴─────────────┐
+                 ▼                           ▼
+        ┌──────────────────┐       ┌──────────────────┐
+        │ Alembic          │       │ Seed Data        │
+        │ Migrations       │       │ Development Data │
+        └──────────────────┘       └──────────────────┘
 
 ## 🛠 Technology Stack
 
