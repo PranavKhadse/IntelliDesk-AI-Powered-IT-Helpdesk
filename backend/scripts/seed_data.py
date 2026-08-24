@@ -11,11 +11,14 @@ from app.models.user import User, UserRole
 from app.models.ticket import Category, Ticket, TicketStatus, TicketPriority
 from app.models.comment import TicketComment, CommentType
 from app.models.kb_article import KBArticle
+from app.models.sla_policy import SLAPolicy
 from app.models.audit_log import AuditLog, AuditAction
 
 
 def seed_database():
     print("[+] Initializing database seeding...")
+    # Ensure tables exist before operating
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
@@ -23,6 +26,7 @@ def seed_database():
         db.query(AuditLog).delete()
         db.query(TicketComment).delete()
         db.query(Ticket).delete()
+        db.query(SLAPolicy).delete()
         db.query(KBArticle).delete()
         db.query(Category).delete()
         db.query(User).delete()
@@ -276,6 +280,49 @@ All access to production AWS accounts and EKS clusters requires an approved Jira
 
         db.commit()
         print(f"[+] Seeded {len(tickets_data)} Sample Tickets with threaded comments and audit trails.")
+
+        # 6. Seed Sample SLA Policies
+        sla_policies_data = [
+            {
+                "name": "Standard Critical Priority SLA",
+                "description": "4-hour resolution target for critical enterprise issues",
+                "priority": "critical",
+                "category_id": None,
+                "first_response_hours": 1,
+                "resolution_hours": 4,
+                "warning_threshold_pct": 75,
+                "escalation_threshold_pct": 90,
+                "is_active": True,
+            },
+            {
+                "name": "Cloud Outage Accelerated SLA",
+                "description": "Expedited SLA for cloud and infrastructure outages",
+                "priority": "high",
+                "category_id": categories["Cloud & Infrastructure"].id,
+                "first_response_hours": 1,
+                "resolution_hours": 4,
+                "warning_threshold_pct": 80,
+                "escalation_threshold_pct": 100,
+                "is_active": True,
+            },
+            {
+                "name": "Access & Permissions Expedited SLA",
+                "description": "Targeted turnaround for IAM and SSO blocker tickets",
+                "priority": None,
+                "category_id": categories["Access & Permissions"].id,
+                "first_response_hours": 2,
+                "resolution_hours": 4,
+                "warning_threshold_pct": 80,
+                "escalation_threshold_pct": 100,
+                "is_active": True,
+            },
+        ]
+        for p_info in sla_policies_data:
+            policy = SLAPolicy(**p_info)
+            db.add(policy)
+
+        db.commit()
+        print(f"[+] Seeded {len(sla_policies_data)} Custom SLA Policies.")
         print("[SUCCESS] Database seeded successfully!")
 
     except Exception as e:
