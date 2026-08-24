@@ -62,6 +62,8 @@ def generate_ticket_triage(
         prompt=(
             "Return only a JSON object with category, priority, urgency, impact, suggested_team, "
             "confidence, evidence, priority_evidence, category_evidence, and urgency_impact_evidence. "
+            "urgency must be one of: 'low', 'medium', 'high', 'critical'. "
+            "impact MUST be one of: 'individual', 'team', 'department', 'organization_wide'. "
             "confidence must be a number from 0 to 1. Each evidence field must contain one to three exact, "
             "short excerpts from the ticket title or description. Do not infer facts not stated in the ticket."
         ),

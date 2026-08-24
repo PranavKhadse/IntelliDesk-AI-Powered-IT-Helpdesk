@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import List, Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SLAState(str, Enum):
@@ -109,13 +109,21 @@ class ProviderSLARiskResponse(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     is_at_risk_of_breach: bool
     predicted_time_to_breach: Optional[str] = None
-    risk_factors: List[str] = Field(min_length=1, max_length=5)
-    recommended_action: str = Field(min_length=1, max_length=500)
+    risk_factors: List[str] = Field(min_length=1, max_length=10)
+    recommended_action: str = Field(min_length=1, max_length=1000)
     escalation_recommended: bool
     escalation_urgency: str = Field(description="low, medium, high, or immediate")
     recommended_priority: str = Field(description="low, medium, high, or critical")
     recommended_team: str = Field(min_length=1, max_length=100)
-    evidence: List[str] = Field(min_length=1, max_length=5)
+    evidence: List[str] = Field(min_length=1, max_length=10)
+
+    @field_validator("risk_factors", "evidence", mode="before")
+    @classmethod
+    def coerce_to_list(cls, value: object) -> object:
+        if isinstance(value, str):
+            lines = [line.strip("- *").strip() for line in value.split("\n") if line.strip()]
+            return lines if lines else [value]
+        return value
 
 
 class AISLARiskAssessment(BaseModel):

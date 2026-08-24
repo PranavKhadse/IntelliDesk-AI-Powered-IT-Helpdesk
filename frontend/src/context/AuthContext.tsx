@@ -20,12 +20,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUserProfile = useCallback(async (): Promise<User | null> => {
     try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setUser(null);
+        return null;
+      }
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const res = await apiClient.get<User>('/auth/me');
       setUser(res.data);
       return res.data;
     } catch {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
+      delete apiClient.defaults.headers.common['Authorization'];
       setUser(null);
       return null;
     }
@@ -35,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initAuth = async () => {
       const token = localStorage.getItem('access_token');
       if (token) {
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         await refreshUserProfile();
       }
       setIsLoading(false);
@@ -46,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await apiClient.post<AuthTokens>('/auth/login', { email, password });
     localStorage.setItem('access_token', res.data.access_token);
     localStorage.setItem('refresh_token', res.data.refresh_token);
+    apiClient.defaults.headers.common['Authorization'] = `Bearer ${res.data.access_token}`;
 
     // Fetch and populate user profile
     const profileRes = await apiClient.get<User>('/auth/me');
@@ -73,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    delete apiClient.defaults.headers.common['Authorization'];
     setUser(null);
   };
 

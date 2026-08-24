@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TriageUrgency(str, Enum):
@@ -40,6 +40,31 @@ class ProviderTriageRecommendation(BaseModel):
     priority_evidence: List[str] = Field(min_length=1, max_length=3)
     category_evidence: List[str] = Field(min_length=1, max_length=3)
     urgency_impact_evidence: List[str] = Field(min_length=1, max_length=3)
+
+    @field_validator("impact", mode="before")
+    @classmethod
+    def normalize_impact(cls, value: object) -> object:
+        if isinstance(value, str):
+            val_clean = value.strip().lower()
+            mapping = {
+                "low": TriageImpact.INDIVIDUAL,
+                "minor": TriageImpact.INDIVIDUAL,
+                "single_user": TriageImpact.INDIVIDUAL,
+                "individual": TriageImpact.INDIVIDUAL,
+                "medium": TriageImpact.TEAM,
+                "moderate": TriageImpact.TEAM,
+                "team": TriageImpact.TEAM,
+                "high": TriageImpact.DEPARTMENT,
+                "major": TriageImpact.DEPARTMENT,
+                "department": TriageImpact.DEPARTMENT,
+                "critical": TriageImpact.ORGANIZATION_WIDE,
+                "company_wide": TriageImpact.ORGANIZATION_WIDE,
+                "organization_wide": TriageImpact.ORGANIZATION_WIDE,
+                "organization": TriageImpact.ORGANIZATION_WIDE,
+            }
+            if val_clean in mapping:
+                return mapping[val_clean]
+        return value
 
 
 class TicketTriageRecommendationBase(BaseModel):

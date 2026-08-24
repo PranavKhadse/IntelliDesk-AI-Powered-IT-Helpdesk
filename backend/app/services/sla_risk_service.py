@@ -122,26 +122,26 @@ def generate_ticket_sla_risk(
     prompt = (
         "You are an expert IT Service Desk SLA Risk and Escalation Intelligence analyzer. "
         "Analyze the provided ticket details, public comments, and system-calculated SLA ground-truth metrics. "
-        "Return ONLY a JSON object containing: "
-        "risk_level ('low', 'medium', 'high', or 'critical'), "
-        "confidence (number from 0.0 to 1.0), "
-        "is_at_risk_of_breach (boolean), "
-        "predicted_time_to_breach (short string e.g. 'Estimated 1.5 hours remaining' or null if breached/resolved), "
-        "risk_factors (array of 1 to 5 concise bullet points based strictly on the ticket context and SLA progress), "
-        "recommended_action (concise, actionable advice for the support team), "
-        "escalation_recommended (boolean indicating if immediate staff escalation is advised), "
-        "escalation_urgency ('low', 'medium', 'high', or 'immediate'), "
-        "recommended_priority ('low', 'medium', 'high', or 'critical'), "
-        "recommended_team (string indicating appropriate escalation tier or team, e.g. 'Tier 2 Support', 'Infrastructure Engineering', 'Security Team'), "
-        "evidence (array of 1 to 5 short exact excerpts from the ticket description, comments, or SLA facts). "
-        "Do NOT invent unsupported facts."
+        "Return ONLY a valid JSON object containing all of the following fields: "
+        "1. risk_level: string, strictly one of: 'low', 'medium', 'high', 'critical'. "
+        "2. confidence: float number between 0.0 and 1.0. "
+        "3. is_at_risk_of_breach: boolean (true or false). "
+        "4. predicted_time_to_breach: short string (e.g. 'Estimated 2 hours remaining') or null. "
+        "5. risk_factors: array of 1 to 5 concise string bullet points based strictly on the ticket context and SLA progress. "
+        "6. recommended_action: string, concise actionable advice for the support team. "
+        "7. escalation_recommended: boolean (true or false indicating if immediate staff escalation is advised). "
+        "8. escalation_urgency: string, strictly one of: 'low', 'medium', 'high', 'immediate'. "
+        "9. recommended_priority: string, strictly one of: 'low', 'medium', 'high', 'critical'. "
+        "10. recommended_team: string indicating appropriate escalation tier or team (e.g. 'Tier 2 Support', 'Infrastructure Engineering', 'Security Team'). "
+        "11. evidence: array of 1 to 5 short exact string excerpts from the ticket description, comments, or SLA facts. "
+        "Do NOT invent unsupported facts. All 11 keys are mandatory."
     )
 
     request = AIRequest(
         capability="sla_risk_assessment",
         prompt=prompt,
         context=context,
-        max_output_tokens=600,
+        max_output_tokens=1500,
         response_format="json_object",
     )
 

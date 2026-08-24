@@ -54,7 +54,8 @@ def get_categories(db: Session = Depends(get_db)):
     return db.query(Category).filter(Category.is_active == True).all()
 
 
-@router.get("/", response_model=TicketListResponse)
+@router.get("", response_model=TicketListResponse)
+@router.get("/", response_model=TicketListResponse, include_in_schema=False)
 def get_tickets(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -88,7 +89,8 @@ def get_tickets(
     )
 
 
-@router.post("/", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=TicketResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def create_new_ticket(
     req: TicketCreate,
     current_user: User = Depends(get_current_user),

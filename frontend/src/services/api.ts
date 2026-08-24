@@ -10,12 +10,22 @@ export const apiClient = axios.create({
   },
 });
 
+// Initialize Authorization header from localStorage if present
+const initialToken = localStorage.getItem('access_token');
+if (initialToken) {
+  apiClient.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
+}
+
 // Request Interceptor: Attach JWT Token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('access_token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set('Authorization', `Bearer ${token}`);
+      } else if (config.headers) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -33,6 +43,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user_info');
+        delete apiClient.defaults.headers.common['Authorization'];
       }
     }
     return Promise.reject(error);
@@ -55,6 +66,12 @@ export const getApiErrorMessage = (error: unknown, fallbackMessage = 'An unexpec
       if (data.detail && typeof data.detail === 'object') {
         if (typeof data.detail.message === 'string' && data.detail.message.trim()) {
           return data.detail.message;
+        }
+      }
+      if (Array.isArray(data.detail) && data.detail.length > 0) {
+        const firstErr = data.detail[0];
+        if (firstErr && typeof firstErr === 'object' && typeof firstErr.msg === 'string') {
+          return firstErr.msg;
         }
       }
     }

@@ -23,7 +23,8 @@ def get_agents(
     return agents
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse])
+@router.get("/", response_model=List[UserResponse], include_in_schema=False)
 def list_all_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin)

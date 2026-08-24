@@ -413,3 +413,31 @@ def test_admin_can_triage_accessible_ticket(client, user_auth_headers, admin_aut
     response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=admin_auth_headers)
 
     assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.parametrize("raw_impact,expected_impact", [
+    ("low", "individual"),
+    ("minor", "individual"),
+    ("individual", "individual"),
+    ("medium", "team"),
+    ("team", "team"),
+    ("high", "department"),
+    ("major", "department"),
+    ("department", "department"),
+    ("critical", "organization_wide"),
+    ("company_wide", "organization_wide"),
+    ("organization_wide", "organization_wide"),
+])
+def test_ticket_triage_normalizes_impact_scale(
+    client, user_auth_headers, db_session, test_agent, monkeypatch, raw_impact, expected_impact
+):
+    add_database_category(db_session)
+    ticket_id = create_triage_ticket(client, user_auth_headers)
+    content = triage_content(impact=raw_impact)
+    install_ai_mock(monkeypatch, AIResponse(content=content, status="success", used_fallback=False))
+
+    response = client.post(f"/api/v1/tickets/{ticket_id}/ai-triage", headers=user_auth_headers)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["impact"] == expected_impact
+

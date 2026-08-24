@@ -454,3 +454,50 @@ def test_escalation_decision_user_forbidden(client, db_session, test_user, test_
         headers=user_auth_headers
     )
     assert res_user_rej.status_code == 403
+
+
+def test_ai_sla_risk_coerces_string_factors_and_evidence(client, db_session, test_user, test_agent, agent_auth_headers, monkeypatch):
+    """Verify SLA Risk safely coerces string or multiline evidence/risk factors from LLM."""
+    ticket = Ticket(
+        ticket_number="IT-RISK-10",
+        title="Network Switch Failure",
+        description="Core network switch rebooting unexpectedly.",
+        priority=TicketPriority.HIGH,
+        status=TicketStatus.OPEN,
+        creator_id=test_user.id,
+    )
+    db_session.add(ticket)
+    db_session.commit()
+
+    # Pass scalar string for risk_factors and evidence
+    mock_ai_content = json.dumps({
+        "risk_level": "high",
+        "confidence": 0.88,
+        "is_at_risk_of_breach": True,
+        "predicted_time_to_breach": "2 hours",
+        "risk_factors": "- Switch reboot loop\n- Hardware power supply failure",
+        "recommended_action": "Replace secondary power supply",
+        "escalation_recommended": True,
+        "escalation_urgency": "high",
+        "recommended_priority": "critical",
+        "recommended_team": "Network Engineering",
+        "evidence": "Core network switch rebooting unexpectedly."
+    })
+
+    mock_ai_service = MagicMock(spec=AIService)
+    mock_ai_service.generate.return_value = AIResponse(
+        content=mock_ai_content,
+        status="success",
+        used_fallback=False
+    )
+    monkeypatch.setattr("app.api.v1.tickets.get_ai_service", lambda: mock_ai_service)
+
+    res = client.post(f"/api/v1/tickets/{ticket.id}/ai-sla-risk", headers=agent_auth_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assessment = data["ai_risk_assessment"]
+    assert isinstance(assessment["risk_factors"], list)
+    assert len(assessment["risk_factors"]) >= 1
+    assert isinstance(assessment["evidence"], list)
+    assert len(assessment["evidence"]) >= 1
+

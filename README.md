@@ -20,6 +20,8 @@
 - [REST API Reference](#-rest-api-reference)
 - [AI Safety, Privacy & Advisory Controls](#-ai-safety-privacy--advisory-controls)
 - [Testing & Quality Assurance](#-testing--quality-assurance)
+- [Future Scope](#-future-scope)
+- [License](#-license)
 
 ---
 
@@ -421,5 +423,27 @@ cmd.exe /c "npm run build"
 
 ---
 
+## Future Scope
+
+Planned possibilities and architectural enhancements for future iterations of IntelliDesk include:
+
+- **Multi-provider AI support** (OpenAI, Anthropic, local/self-hosted models)
+- **AI confidence monitoring and model evaluation**
+- **Automatic knowledge-base article generation and improvement**
+- **Advanced semantic/vector search for knowledge-base grounding**
+- **AI-powered duplicate ticket detection**
+- **Automated ticket routing and intelligent agent assignment**
+- **Predictive SLA breach analytics and workload forecasting**
+- **AI feedback loop using human accept/reject decisions**
+- **Real-time notifications and escalation workflows**
+- **Analytics dashboard for support-team performance and AI effectiveness**
+- **File/attachment analysis for troubleshooting**
+- **Enterprise integrations** such as Slack, Microsoft Teams, email, and monitoring tools
+- **Production deployment with Docker and cloud infrastructure**
+- **Observability, metrics, tracing, rate limiting, and AI cost monitoring**
+
+---
+
 ## 📄 License
 This project is developed for educational and enterprise IT service management demonstration purposes. All rights reserved.
+

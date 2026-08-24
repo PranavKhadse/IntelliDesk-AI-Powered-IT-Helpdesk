@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Base backend directory
@@ -36,6 +36,33 @@ class Settings(BaseSettings):
     AI_MODEL: str = ""
     AI_API_BASE_URL: str = ""
     AI_TIMEOUT_SECONDS: float = 10.0
+
+    # Environment variable aliases for provider flexibility
+    LLM_PROVIDER: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    
+    @property
+    def effective_ai_provider(self) -> str:
+        if self.AI_PROVIDER and self.AI_PROVIDER.strip().lower() != "none":
+            return self.AI_PROVIDER.strip().lower()
+        if self.LLM_PROVIDER and self.LLM_PROVIDER.strip().lower() != "none":
+            return self.LLM_PROVIDER.strip().lower()
+        if self.GEMINI_API_KEY and self.GEMINI_API_KEY.strip():
+            return "gemini"
+        if self.OPENAI_API_KEY and self.OPENAI_API_KEY.strip():
+            return "openai"
+        return "none"
+
+    @property
+    def effective_ai_api_key(self) -> str:
+        if self.AI_API_KEY and self.AI_API_KEY.strip() and self.AI_API_KEY != "your_ai_provider_api_key_here":
+            return self.AI_API_KEY.strip()
+        if self.GEMINI_API_KEY and self.GEMINI_API_KEY.strip():
+            return self.GEMINI_API_KEY.strip()
+        if self.OPENAI_API_KEY and self.OPENAI_API_KEY.strip():
+            return self.OPENAI_API_KEY.strip()
+        return ""
     
     @property
     def cors_origins_list(self) -> List[str]:
