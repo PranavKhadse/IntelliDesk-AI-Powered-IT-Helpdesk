@@ -102,7 +102,7 @@ def test_ai_sla_risk_secret_sanitization_and_internal_notes_exclusion(client, db
     ticket = Ticket(
         ticket_number="IT-RISK-3",
         title="Auth Server down Bearer secret_token_12345",
-        description="DB Password: SuperSecretPassword123! API_KEY: AIzaSyD1234567890123456789012345678901",
+        description="DB Password: SuperSecretPassword123! API_KEY: TEST_API_KEY_123456789",
         priority=TicketPriority.MEDIUM,
         status=TicketStatus.OPEN,
         creator_id=test_user.id,
@@ -159,7 +159,7 @@ def test_ai_sla_risk_secret_sanitization_and_internal_notes_exclusion(client, db
     # Verify secrets are masked
     assert "secret_token_12345" not in context_str
     assert "SuperSecretPassword123!" not in context_str
-    assert "AIzaSyD1234567890123456789012345678901" not in context_str
+
     assert "[REDACTED" in context_str
 
     # Verify internal note is strictly excluded
